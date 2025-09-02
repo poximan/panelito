@@ -5,145 +5,190 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
-import android.util.Log // ¡Importante: Importar esto!
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import org.json.JSONObject
 import servicoop.comunic.redirectorllamadas.R
 import servicoop.comunic.redirectorllamadas.mqtt.MQTTService
+import servicoop.comunic.redirectorllamadas.mqtt.Thresholds
+import servicoop.comunic.redirectorllamadas.mqtt.GrdDesconectado
+import servicoop.comunic.redirectorllamadas.mqtt.ui.DisconnectedGrdAdapter
+import servicoop.comunic.redirectorllamadas.mqtt.BrokerEstado
+import java.util.*
 
 class MqttFragment : Fragment() {
 
     private lateinit var switchConnect: Switch
-    private lateinit var indicatorStatus: View
-    private lateinit var txtMensajes: TextView
 
-    // Receptor de broadcasts para actualizar la UI desde el MQTTService
+    // Broker (local)
+    private lateinit var indicatorBroker: View
+    private lateinit var txtBroker: TextView
+
+    // Modem (remoto)
+    private lateinit var indicatorModem: View
+    private lateinit var txtModem: TextView
+
+    // Grado
+    private lateinit var progressGrado: ProgressBar
+    private lateinit var txtGradoPct: TextView
+    private lateinit var indicatorSalud: View
+
+    // Lista GRDs
+    private lateinit var rvGrds: RecyclerView
+    private lateinit var grdsAdapter: DisconnectedGrdAdapter
+
     private val mqttReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d("MqttFragment", "mqttReceiver: Intent recibido. Action = ${intent?.action}")
             when (intent?.action) {
-                MQTTService.ACTION_MENSAJE -> {
-                    val mensaje = intent.getStringExtra(MQTTService.EXTRA_MENSAJE) ?: return
-                    Log.d("MqttFragment", "mqttReceiver: Mensaje MQTT: $mensaje")
-                    actualizarPantalla(mensaje)
+                MQTTService.ACTION_BROKER_ESTADO -> {
+                    val estado = intent.getStringExtra(MQTTService.EXTRA_BROKER_ESTADO) ?: return
+                    actualizarBrokerEstado(estado)
                 }
-                MQTTService.ACTION_ESTADO -> {
-                    // Recibe el estado de conexion
-                    val estado = intent.getStringExtra(MQTTService.EXTRA_ESTADO) ?: return
-                    Log.d("MqttFragment", "mqttReceiver: Estado MQTT: $estado")
-                    actualizarEstadoUI(estado)
+                MQTTService.ACTION_MODEM_ESTADO -> {
+                    val estado = intent.getStringExtra(MQTTService.EXTRA_MODEM_ESTADO) ?: return
+                    actualizarModemEstado(estado)
+                }
+                MQTTService.ACTION_ACTUALIZAR_GRADO -> {
+                    val pct = intent.getDoubleExtra(MQTTService.EXTRA_GRADO_PCT, Double.NaN)
+                    if (!pct.isNaN()) actualizarGrado(pct)
+                }
+                MQTTService.ACTION_ACTUALIZAR_GRDS -> {
+                    val json = intent.getStringExtra(MQTTService.EXTRA_GRDS_JSON) ?: return
+                    actualizarGrds(json)
                 }
                 MQTTService.ACTION_ERROR -> {
-                    // Recibe mensajes de error
-                    val error = intent.getStringExtra(MQTTService.EXTRA_ERROR) ?: return
-                    Log.d("MqttFragment", "mqttReceiver: Error MQTT: $error")
-                    actualizarPantalla("ERROR: $error")
+                    val err = intent.getStringExtra(MQTTService.EXTRA_ERROR) ?: return
+                    Log.e("MqttFragment", "ERROR: $err")
                 }
             }
         }
     }
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        Log.d("MqttFragment", "onCreateView: Fragmento creado.")
-        val view = inflater.inflate(R.layout.fragment_mqtt, container, false)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        val v = inflater.inflate(R.layout.fragment_mqtt, container, false)
 
-        switchConnect = view.findViewById(R.id.switch_connect)
-        indicatorStatus = view.findViewById(R.id.indicator_status)
-        txtMensajes = view.findViewById(R.id.txt_mensajes)
+        switchConnect = v.findViewById(R.id.switch_connect)
 
-        // Listener para el switch de conexion
+        indicatorBroker = v.findViewById(R.id.indicator_broker)
+        txtBroker = v.findViewById(R.id.txt_broker)
+
+        indicatorModem = v.findViewById(R.id.indicator_modem)
+        txtModem = v.findViewById(R.id.txt_modem)
+
+        progressGrado = v.findViewById(R.id.progress_grado)
+        txtGradoPct = v.findViewById(R.id.txt_grado_pct)
+        indicatorSalud = v.findViewById(R.id.indicator_salud)
+
+        rvGrds = v.findViewById(R.id.rv_grds)
+        grdsAdapter = DisconnectedGrdAdapter()
+        rvGrds.layoutManager = LinearLayoutManager(requireContext())
+        rvGrds.adapter = grdsAdapter
+
         switchConnect.setOnCheckedChangeListener { _, isChecked ->
-            Log.d("MqttFragment", "switchConnect: Switch cambiado a $isChecked")
-            if (isChecked) {
-                iniciarServicioMQTT()
-                actualizarEstadoUI(MQTTService.ESTADO_CONECTANDO)
-            } else {
-                detenerServicioMQTT()
-                actualizarEstadoUI(MQTTService.ESTADO_DESCONECTADO)
-            }
+            if (isChecked) iniciarServicio() else detenerServicio()
         }
 
-        return view
+        return v
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d("MqttFragment", "onResume: Registrando BroadcastReceiver.")
         val filter = IntentFilter().apply {
-            addAction(MQTTService.ACTION_MENSAJE)
-            addAction(MQTTService.ACTION_ESTADO)
+            addAction(MQTTService.ACTION_BROKER_ESTADO)
+            addAction(MQTTService.ACTION_MODEM_ESTADO)
+            addAction(MQTTService.ACTION_ACTUALIZAR_GRADO)
+            addAction(MQTTService.ACTION_ACTUALIZAR_GRDS)
             addAction(MQTTService.ACTION_ERROR)
         }
         LocalBroadcastManager.getInstance(requireContext()).registerReceiver(mqttReceiver, filter)
 
-        solicitarEstadoServicio()
+        // solicitar ultimo estado al servicio
+        val i = Intent(requireContext(), MQTTService::class.java).apply {
+            putExtra(MQTTService.EXTRA_SOLICITAR_ESTADO, true)
+        }
+        requireContext().startService(i)
     }
 
     override fun onPause() {
         super.onPause()
-        Log.d("MqttFragment", "onPause: Desregistrando BroadcastReceiver.")
         LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(mqttReceiver)
     }
 
-    private fun iniciarServicioMQTT() {
-        Log.d("MqttFragment", "iniciarServicioMQTT: Iniciando MQTTService.")
+    private fun iniciarServicio() {
         requireContext().startForegroundService(Intent(requireContext(), MQTTService::class.java))
     }
 
-    private fun detenerServicioMQTT() {
-        Log.d("MqttFragment", "detenerServicioMQTT: Deteniendo MQTTService.")
+    private fun detenerServicio() {
         requireContext().stopService(Intent(requireContext(), MQTTService::class.java))
+        actualizarBrokerEstado(BrokerEstado.DESCONECTADO.name)
+        actualizarModemEstado("DESCONECTADO")
     }
 
-    private fun actualizarEstadoUI(estado: String) {
-        Log.d("MqttFragment", "actualizarEstadoUI: Actualizando UI a estado: $estado")
-        when (estado) {
-            MQTTService.ESTADO_CONECTADO -> {
-                indicatorStatus.setBackgroundResource(R.drawable.led_verde)
+    // UI updates
+    private fun actualizarBrokerEstado(estado: String) {
+        txtBroker.text = "Broker: $estado"
+        when (estado.uppercase(Locale.getDefault())) {
+            BrokerEstado.CONECTADO.name -> {
+                indicatorBroker.setBackgroundResource(R.drawable.led_verde)
                 switchConnect.isChecked = true
-                actualizarPantalla("Estado: Conectado al broker MQTT.")
             }
-            MQTTService.ESTADO_DESCONECTADO -> {
-                indicatorStatus.setBackgroundResource(R.drawable.led_rojo)
-                switchConnect.isChecked = false
-                actualizarPantalla("Estado: Desconectado del broker MQTT.")
-            }
-            MQTTService.ESTADO_CONECTANDO -> {
-                indicatorStatus.setBackgroundResource(R.drawable.led_naranja)
+            BrokerEstado.CONECTANDO.name, BrokerEstado.REINTENTANDO.name -> {
+                indicatorBroker.setBackgroundResource(R.drawable.led_naranja)
                 switchConnect.isChecked = true
-                actualizarPantalla("Estado: Intentando conectar...")
             }
-            MQTTService.ESTADO_REINTENTANDO -> {
-                indicatorStatus.setBackgroundResource(R.drawable.led_naranja)
-                switchConnect.isChecked = true
-                actualizarPantalla("Estado: Reintentando conexion...")
+            BrokerEstado.ERROR.name, BrokerEstado.DESCONECTADO.name -> {
+                indicatorBroker.setBackgroundResource(R.drawable.led_rojo)
             }
-            MQTTService.ESTADO_ERROR -> {
-                indicatorStatus.setBackgroundResource(R.drawable.led_rojo)
-                switchConnect.isChecked = false
-            }
+            else -> indicatorBroker.setBackgroundResource(R.drawable.led_rojo)
         }
     }
 
-    private fun actualizarPantalla(mensaje: String) {
-        Log.d("MqttFragment", "actualizarPantalla: Añadiendo mensaje a UI: $mensaje")
-        val textoPrevio = txtMensajes.text.toString()
-        txtMensajes.text = "$mensaje\n$textoPrevio"
+    private fun actualizarModemEstado(estado: String) {
+        txtModem.text = "Modem: $estado"
+        if (estado.equals("CONECTADO", ignoreCase = true)) {
+            indicatorModem.setBackgroundResource(R.drawable.led_verde)
+        } else {
+            indicatorModem.setBackgroundResource(R.drawable.led_rojo)
+        }
     }
 
-    private fun solicitarEstadoServicio() {
-        Log.d("MqttFragment", "solicitarEstadoServicio: Solicitando estado actual del MQTTService.")
-        val intent = Intent(requireContext(), MQTTService::class.java).apply {
-            putExtra("solicitar_estado", true)
+    private fun actualizarGrado(porcentaje: Double) {
+        val pctInt = porcentaje.coerceIn(0.0, 100.0).toInt()
+        progressGrado.progress = pctInt
+        txtGradoPct.text = String.format(Locale.getDefault(), "%.1f%%", porcentaje)
+
+        val led = when {
+            porcentaje < Thresholds.ROJO -> R.drawable.led_rojo
+            porcentaje < Thresholds.AMARILLO -> R.drawable.led_naranja
+            else -> R.drawable.led_verde
         }
-        requireContext().startService(intent)
+        indicatorSalud.setBackgroundResource(led)
+    }
+
+    private fun actualizarGrds(json: String) {
+        try {
+            val root = JSONObject(json)
+            val arr = root.optJSONArray("items") ?: return
+            val out = ArrayList<GrdDesconectado>(arr.length())
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val id = o.optInt("id")
+                val nombre = o.optString("nombre", "N/D")
+                val uc = o.optString("ultima_caida", "")
+                out.add(GrdDesconectado(id, nombre, uc))
+            }
+            grdsAdapter.submit(out)
+        } catch (e: Exception) {
+            Log.e("MqttFragment", "Error parseando GRDs: ${e.message}", e)
+        }
     }
 }

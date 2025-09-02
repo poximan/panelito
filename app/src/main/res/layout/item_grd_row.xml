@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="8dp">
+
+    <TextView
+        android:id="@+id/txt_equipo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Equipo"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="2dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ultima caida: " />
+
+        <TextView
+            android:id="@+id/txt_ultima"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="N/D" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="2dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="T.desc: " />
+
+        <TextView
+            android:id="@+id/txt_tdesc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0m" />
+    </LinearLayout>
+</LinearLayout>

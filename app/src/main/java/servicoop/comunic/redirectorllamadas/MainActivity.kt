@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.fragment_container, MqttFragment())
                 .commit()
-            Log.d("MainActivity", "onCreate: MqttFragment añadido.")
+            Log.d("MainActivity", "onCreate: MqttFragment agregado.")
         }
     }
 
@@ -36,24 +36,23 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-                Log.d("MainActivity", "requestPermissions: POST_NOTIFICATIONS no concedido, añadiendo a solicitud.")
+                Log.d("MainActivity", "requestPermissions: POST_NOTIFICATIONS no concedido, agregando a solicitud.")
             }
         }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.READ_PHONE_STATE)
-            Log.d("MainActivity", "requestPermissions: READ_PHONE_STATE no concedido, añadiendo a solicitud.")
+            Log.d("MainActivity", "requestPermissions: READ_PHONE_STATE no concedido, agregando a solicitud.")
         }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.READ_CONTACTS)
-            Log.d("MainActivity", "requestPermissions: READ_CONTACTS no concedido, añadiendo a solicitud.")
+            Log.d("MainActivity", "requestPermissions: READ_CONTACTS no concedido, agregando a solicitud.")
         }
 
-        // ¡Añadir este permiso!
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.READ_CALL_LOG)
-            Log.d("MainActivity", "requestPermissions: READ_CALL_LOG no concedido, añadiendo a solicitud.")
+            Log.d("MainActivity", "requestPermissions: READ_CALL_LOG no concedido, agregando a solicitud.")
         }
 
         if (permissionsToRequest.isNotEmpty()) {
