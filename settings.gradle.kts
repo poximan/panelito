@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "redirectorllamadas"
+rootProject.name = "panelito"
 include(":app")

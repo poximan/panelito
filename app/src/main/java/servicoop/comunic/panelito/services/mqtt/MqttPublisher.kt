@@ -1,4 +1,4 @@
-package servicoop.comunic.redirectorllamadas.mqtt
+package servicoop.comunic.panelito.services.mqtt
 
 import android.content.Context
 import android.content.Intent
@@ -13,11 +13,13 @@ import org.json.JSONObject
  */
 object MqttPublisher {
 
-    private const val ENABLE_PUBLISH = false // mantener false para el esquema actual (solo servidor publica)
+    private const val ENABLE_PUBLISH =
+        false // mantener false para el esquema actual (solo servidor publica)
 
     // topic namespaced por dispositivo para evitar colisiones entre multiples apps
     private fun topicIncomingCalls(context: Context): String {
-        val id = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown"
+        val id = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
+            ?: "unknown"
         return "exemys/app/Redirector_$id/llamadas/entrantes"
     }
 
@@ -45,7 +47,10 @@ object MqttPublisher {
         }
         val message = jsonMessage.toString()
 
-        Log.d("MqttPublisher", "Preparando publicacion. topic='$topic' msg='${message.take(100)}...'")
+        Log.d(
+            "MqttPublisher",
+            "Preparando publicacion. topic='$topic' msg='${message.take(100)}...'"
+        )
 
         val publishIntent = Intent(context, MQTTService::class.java).apply {
             action = MQTTService.ACTION_PUBLICAR
@@ -59,7 +64,11 @@ object MqttPublisher {
             context.startService(publishIntent)
             Log.d("MqttPublisher", "Intent de publicacion enviado a MQTTService.")
         } catch (e: Exception) {
-            Log.e("MqttPublisher", "Error al enviar intent de publicacion a MQTTService: ${e.message}", e)
+            Log.e(
+                "MqttPublisher",
+                "Error al enviar intent de publicacion a MQTTService: ${e.message}",
+                e
+            )
         }
     }
 }

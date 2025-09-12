@@ -1,4 +1,4 @@
-package servicoop.comunic.redirectorllamadas.fragment
+package servicoop.comunic.panelito.fragment
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -17,13 +17,13 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import org.json.JSONObject
-import servicoop.comunic.redirectorllamadas.R
-import servicoop.comunic.redirectorllamadas.mqtt.MQTTService
-import servicoop.comunic.redirectorllamadas.mqtt.Thresholds
-import servicoop.comunic.redirectorllamadas.mqtt.GrdDesconectado
-import servicoop.comunic.redirectorllamadas.mqtt.ui.DisconnectedGrdAdapter
-import servicoop.comunic.redirectorllamadas.mqtt.BrokerEstado
-import java.util.*
+import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.core.model.BrokerEstado
+import servicoop.comunic.panelito.core.model.GrdDesconectado
+import servicoop.comunic.panelito.core.util.Thresholds
+import servicoop.comunic.panelito.services.mqtt.MQTTService
+import servicoop.comunic.panelito.ui.adapter.DisconnectedGrdAdapter
+import java.util.Locale
 
 class MqttFragment : Fragment() {
 
@@ -73,7 +73,11 @@ class MqttFragment : Fragment() {
         }
     }
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         val v = inflater.inflate(R.layout.fragment_mqtt, container, false)
 
         switchConnect = v.findViewById(R.id.switch_connect)

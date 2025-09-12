@@ -1,8 +1,4 @@
-package servicoop.comunic.redirectorllamadas.mqtt
-
-data class GradoConectividad(
-    val porcentaje: Double
-)
+package servicoop.comunic.panelito.core.model
 
 data class GrdDesconectado(
     val id: Int,

@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "servicoop.comunic.redirectorllamadas"
+    namespace = "servicoop.comunic.panelito"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "servicoop.comunic.redirectorllamadas"
+        applicationId = "servicoop.comunic.panelito"
         minSdk = 28
         targetSdk = 33
         versionCode = 1

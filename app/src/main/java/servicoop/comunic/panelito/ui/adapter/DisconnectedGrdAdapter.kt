@@ -1,4 +1,4 @@
-package servicoop.comunic.redirectorllamadas.mqtt.ui
+package servicoop.comunic.panelito.ui.adapter
 
 import android.view.LayoutInflater
 import android.view.View
@@ -7,9 +7,9 @@ import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import servicoop.comunic.redirectorllamadas.R
-import servicoop.comunic.redirectorllamadas.mqtt.GrdDesconectado
-import servicoop.comunic.redirectorllamadas.mqtt.TimeUtils
+import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.core.model.GrdDesconectado
+import servicoop.comunic.panelito.core.util.TimeUtils
 
 class DisconnectedGrdAdapter :
     ListAdapter<GrdDesconectado, DisconnectedGrdAdapter.VH>(DIFF) {
@@ -42,12 +42,15 @@ class DisconnectedGrdAdapter :
 
     companion object {
         private val DIFF = object : DiffUtil.ItemCallback<GrdDesconectado>() {
-            override fun areItemsTheSame(oldItem: GrdDesconectado, newItem: GrdDesconectado): Boolean {
-                return oldItem.id == newItem.id
-            }
-            override fun areContentsTheSame(oldItem: GrdDesconectado, newItem: GrdDesconectado): Boolean {
-                return oldItem == newItem
-            }
+            override fun areItemsTheSame(
+                oldItem: GrdDesconectado,
+                newItem: GrdDesconectado
+            ): Boolean = oldItem.id == newItem.id
+
+            override fun areContentsTheSame(
+                oldItem: GrdDesconectado,
+                newItem: GrdDesconectado
+            ): Boolean = oldItem == newItem
         }
     }
 }
