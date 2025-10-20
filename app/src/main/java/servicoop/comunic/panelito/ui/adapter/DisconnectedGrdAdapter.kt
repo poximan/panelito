@@ -1,5 +1,7 @@
 package servicoop.comunic.panelito.ui.adapter
 
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,8 +16,30 @@ import servicoop.comunic.panelito.core.util.TimeUtils
 class DisconnectedGrdAdapter :
     ListAdapter<GrdDesconectado, DisconnectedGrdAdapter.VH>(DIFF) {
 
+    private val handler = Handler(Looper.getMainLooper())
+    private val ticker = object : Runnable {
+        override fun run() {
+            // Refresca todas las filas para recalcular T.desc
+            notifyDataSetChanged()
+            handler.postDelayed(this, 60_000L)
+        }
+    }
+
     fun submit(newItems: List<GrdDesconectado>) {
         submitList(ArrayList(newItems))
+    }
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        // Arranca ticker cuando el adapter esta en uso
+        handler.removeCallbacks(ticker)
+        handler.postDelayed(ticker, 60_000L)
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        // Detiene ticker para evitar consumo cuando no esta visible
+        handler.removeCallbacks(ticker)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
@@ -36,7 +60,7 @@ class DisconnectedGrdAdapter :
             txtEquipo.text = item.nombre
             txtUltima.text = item.ultimaCaida
             val desc = TimeUtils.sinceDescription(item.ultimaCaida)
-            txtTdesc.text = desc ?: "N/D"
+            txtTdesc.text = desc ?: itemView.context.getString(R.string.value_not_available)
         }
     }
 

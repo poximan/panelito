@@ -1,3 +1,68 @@
 <resources>
     <string name="app_name">Panelito</string>
+
+    <!-- UI labels -->
+    <string name="switch_connect_broker">Conectar broker</string>
+    <string name="broker_status_placeholder">Broker: DESCONECTADO</string>
+    <string name="modem_status_placeholder">Modem: desconectado</string>
+    <string name="email_summary_placeholder">Email: --</string>
+    <string name="email_smtp_placeholder">SMTP en host LAN (post.servicoop.com): --</string>
+    <string name="email_ping_local_placeholder">Ping IPPUB gw local (servicoop.com.ar): --</string>
+    <string name="email_ping_remote_placeholder">Ping IPPUB serv remoto (mail.servicoop.com): --</string>
+    <string name="grade_connectivity_title">Grado conectividad</string>
+    <string name="grade_percentage_placeholder">0.0%</string>
+    <string name="disconnected_list_title">Actualmente desconectados</string>
+    <string name="item_grd_equipment_label">Equipo</string>
+    <string name="item_grd_last_drop_label">Ultima caida: </string>
+    <string name="value_not_available">N/D</string>
+    <string name="item_grd_tdesc_label">T.desc: </string>
+    <string name="item_grd_default_elapsed">0m</string>
+
+    <!-- Messages -->
+    <string name="permissions_denied_message">Algunos permisos importantes fueron denegados. La aplicacion podria no funcionar correctamente.</string>
+    <string name="permissions_granted_message">Todos los permisos necesarios concedidos.</string>
+
+    <!-- Fragment labels -->
+    <string name="broker_status">Broker: %1$s</string>
+    <string name="modem_status">Modem: %1$s</string>
+    <string name="email_summary_no_data">Email: sin datos</string>
+    <string name="email_summary_no_service">Email: sin servicio</string>
+    <string name="email_summary_unknown">Email: indeterminado</string>
+    <string name="email_summary_operational">Email: operativo</string>
+    <string name="email_smtp_format">SMTP en host LAN (post.servicoop.com): %1$s</string>
+    <string name="email_ping_local_format">Ping IPPUB gw local (servicoop.com.ar): %1$s</string>
+    <string name="email_ping_remote_format">Ping IPPUB serv remoto (mail.servicoop.com): %1$s</string>
+    <string name="status_unknown">desconocido</string>
+    <string name="status_disconnected_upper">DESCONECTADO</string>
+    <string name="status_disconnected_capitalized">Desconectado</string>
+    <string name="status_connected_capitalized">Conectado</string>
+    <string name="status_reconnected_capitalized">Reconectado</string>
+    <string name="status_unknown_capitalized">Desconocido</string>
+    <string name="percent_format">%.1f%%</string>
+
+    <!-- Notifications and errors -->
+    <string name="notification_channel_name">MQTT Service Notifications</string>
+    <string name="notification_text_broker_disconnected">Desconectado del broker MQTT</string>
+    <string name="notification_text_no_network_title">Sin conexion de red</string>
+    <string name="notification_text_no_network_body">Esperando red...</string>
+    <string name="notification_text_service_stopped_title">Servicio MQTT detenido</string>
+    <string name="notification_text_service_stopped_body">@string/status_disconnected_capitalized</string>
+    <string name="notification_text_reconnecting_title">Reconectando...</string>
+    <string name="notification_text_reconnecting_body">Intentando reconectar</string>
+    <string name="notification_title_service">Servicio MQTT</string>
+    <string name="notification_text_service_reconnected">@string/status_reconnected_capitalized</string>
+    <string name="notification_text_service_connected">@string/status_connected_capitalized</string>
+    <string name="notification_text_connecting_title">Conectando...</string>
+    <string name="notification_text_connecting_body">Estableciendo conexion MQTT</string>
+    <string name="error_publication_missing_data">Faltan datos de publicacion (topic o mensaje)</string>
+    <string name="error_connection_lost">Conexion perdida: %1$s</string>
+    <string name="error_subscription">Error al suscribirse: %1$s</string>
+    <string name="error_parse_grade">Error parseando grado: %1$s</string>
+    <string name="error_connection_failure">Fallo de conexion: %1$s</string>
+    <string name="error_not_connected_publish">No conectado al broker. No se publico en %1$s</string>
+    <string name="error_publish_topic">Error publicando en %1$s: %2$s</string>
+
+    <!-- Contacts -->
+    <string name="contact_permission_denied">Permiso denegado</string>
+    <string name="contact_generic_error">Error</string>
 </resources>

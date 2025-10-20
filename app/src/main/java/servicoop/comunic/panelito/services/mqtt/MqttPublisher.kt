@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.util.Log
 import org.json.JSONObject
+import servicoop.comunic.panelito.R
 
 /**
  * Publisher opcional.
@@ -42,7 +43,10 @@ object MqttPublisher {
         val jsonMessage = JSONObject().apply {
             put("tipo_evento", "llamada_entrante")
             put("numero_telefono", phoneNumber)
-            put("nombre_contacto", callerName ?: "Desconocido")
+            put(
+                "nombre_contacto",
+                callerName ?: context.getString(R.string.status_unknown_capitalized)
+            )
             put("timestamp", System.currentTimeMillis())
         }
         val message = jsonMessage.toString()

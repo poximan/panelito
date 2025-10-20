@@ -10,22 +10,31 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.data.datastore.SettingsDataStore
+import servicoop.comunic.panelito.domain.repository.SettingsRepository
 import servicoop.comunic.panelito.fragment.MqttFragment
 
 class MainActivity : AppCompatActivity() {
 
     private val PERMISSION_REQUEST_CODE = 1001
 
+    // provider simple del repositorio para toda la UI
+    lateinit var settingsRepo: SettingsRepository
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // inyeccion manual (si luego queres, migramos a DI)
+        settingsRepo = SettingsDataStore(this)
 
         Log.d("MainActivity", "onCreate: Solicitando permisos.")
         requestPermissions()
 
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, MqttFragment())
+                .replace(R.id.fragment_container, MqttFragment.newInstance())
                 .commit()
             Log.d("MainActivity", "onCreate: MqttFragment agregado.")
         }
@@ -104,13 +113,13 @@ class MainActivity : AppCompatActivity() {
                 Log.e("MainActivity", "Permisos denegados: ${deniedPermissions.joinToString()}")
                 Toast.makeText(
                     this,
-                    "Algunos permisos importantes fueron denegados. La aplicacion podria no funcionar correctamente.",
+                    getString(R.string.permissions_denied_message),
                     Toast.LENGTH_LONG
                 ).show()
             } else {
                 Toast.makeText(
                     this,
-                    "Todos los permisos necesarios concedidos.",
+                    getString(R.string.permissions_granted_message),
                     Toast.LENGTH_SHORT
                 ).show()
             }

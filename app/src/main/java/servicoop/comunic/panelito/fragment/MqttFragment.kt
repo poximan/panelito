@@ -13,15 +13,20 @@ import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.GrdDesconectado
 import servicoop.comunic.panelito.core.util.Thresholds
+import servicoop.comunic.panelito.domain.repository.SettingsRepository
 import servicoop.comunic.panelito.services.mqtt.MQTTService
+import servicoop.comunic.panelito.ui.MainActivity
 import servicoop.comunic.panelito.ui.adapter.DisconnectedGrdAdapter
 import java.util.Locale
 
@@ -37,6 +42,13 @@ class MqttFragment : Fragment() {
     private lateinit var indicatorModem: View
     private lateinit var txtModem: TextView
 
+    // Correo
+    private lateinit var indicatorEmail: View
+    private lateinit var txtEmailResumen: TextView
+    private lateinit var txtEmailSmtp: TextView
+    private lateinit var txtEmailPingLocal: TextView
+    private lateinit var txtEmailPingRemoto: TextView
+
     // Grado
     private lateinit var progressGrado: ProgressBar
     private lateinit var txtGradoPct: TextView
@@ -46,6 +58,9 @@ class MqttFragment : Fragment() {
     private lateinit var rvGrds: RecyclerView
     private lateinit var grdsAdapter: DisconnectedGrdAdapter
 
+    // Repo de settings (inyectado por la actividad)
+    private lateinit var settingsRepo: SettingsRepository
+
     private val mqttReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -53,24 +68,37 @@ class MqttFragment : Fragment() {
                     val estado = intent.getStringExtra(MQTTService.EXTRA_BROKER_ESTADO) ?: return
                     actualizarBrokerEstado(estado)
                 }
+
                 MQTTService.ACTION_MODEM_ESTADO -> {
                     val estado = intent.getStringExtra(MQTTService.EXTRA_MODEM_ESTADO) ?: return
                     actualizarModemEstado(estado)
                 }
+
                 MQTTService.ACTION_ACTUALIZAR_GRADO -> {
                     val pct = intent.getDoubleExtra(MQTTService.EXTRA_GRADO_PCT, Double.NaN)
                     if (!pct.isNaN()) actualizarGrado(pct)
                 }
+
                 MQTTService.ACTION_ACTUALIZAR_GRDS -> {
                     val json = intent.getStringExtra(MQTTService.EXTRA_GRDS_JSON) ?: return
                     actualizarGrds(json)
                 }
+
+                MQTTService.ACTION_EMAIL_ESTADO -> {
+                    val json = intent.getStringExtra(MQTTService.EXTRA_EMAIL_ESTADO) ?: return
+                    actualizarEmailEstado(json)
+                }
+
                 MQTTService.ACTION_ERROR -> {
                     val err = intent.getStringExtra(MQTTService.EXTRA_ERROR) ?: return
                     Log.e("MqttFragment", "ERROR: $err")
                 }
             }
         }
+    }
+
+    companion object {
+        fun newInstance(): MqttFragment = MqttFragment()
     }
 
     override fun onCreateView(
@@ -80,6 +108,9 @@ class MqttFragment : Fragment() {
     ): View {
         val v = inflater.inflate(R.layout.fragment_mqtt, container, false)
 
+        // inyeccion: tomar repo desde la actividad
+        settingsRepo = (requireActivity() as MainActivity).settingsRepo
+
         switchConnect = v.findViewById(R.id.switch_connect)
 
         indicatorBroker = v.findViewById(R.id.indicator_broker)
@@ -87,6 +118,12 @@ class MqttFragment : Fragment() {
 
         indicatorModem = v.findViewById(R.id.indicator_modem)
         txtModem = v.findViewById(R.id.txt_modem)
+
+        indicatorEmail = v.findViewById(R.id.indicator_email)
+        txtEmailResumen = v.findViewById(R.id.txt_email_resumen)
+        txtEmailSmtp = v.findViewById(R.id.txt_email_smtp)
+        txtEmailPingLocal = v.findViewById(R.id.txt_email_ping_local)
+        txtEmailPingRemoto = v.findViewById(R.id.txt_email_ping_remoto)
 
         progressGrado = v.findViewById(R.id.progress_grado)
         txtGradoPct = v.findViewById(R.id.txt_grado_pct)
@@ -97,8 +134,22 @@ class MqttFragment : Fragment() {
         rvGrds.layoutManager = LinearLayoutManager(requireContext())
         rvGrds.adapter = grdsAdapter
 
+        // listener de UI: persiste voluntad del usuario y arranca/para servicio
         switchConnect.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                settingsRepo.setServiceEnabled(isChecked)
+            }
             if (isChecked) iniciarServicio() else detenerServicio()
+        }
+
+        // inicializacion: garantizar defaults y reflejar estado
+        lifecycleScope.launch {
+            // asegura primer arranque ON si aun no hay init_done
+            settingsRepo.ensureDefaults()
+
+            val enabled = settingsRepo.getServiceEnabled().first()
+            switchConnect.isChecked = enabled
+            if (enabled) iniciarServicio() else detenerServicio()
         }
 
         return v
@@ -111,15 +162,13 @@ class MqttFragment : Fragment() {
             addAction(MQTTService.ACTION_MODEM_ESTADO)
             addAction(MQTTService.ACTION_ACTUALIZAR_GRADO)
             addAction(MQTTService.ACTION_ACTUALIZAR_GRDS)
+            addAction(MQTTService.ACTION_EMAIL_ESTADO)
             addAction(MQTTService.ACTION_ERROR)
         }
         LocalBroadcastManager.getInstance(requireContext()).registerReceiver(mqttReceiver, filter)
 
-        // solicitar ultimo estado al servicio
-        val i = Intent(requireContext(), MQTTService::class.java).apply {
-            putExtra(MQTTService.EXTRA_SOLICITAR_ESTADO, true)
-        }
-        requireContext().startService(i)
+        // Importante: no iniciar servicio aqui. Respetar preferencia del usuario.
+        // Si se desea un refresh de estado, el servicio lo emitira al conectar.
     }
 
     override fun onPause() {
@@ -134,30 +183,38 @@ class MqttFragment : Fragment() {
     private fun detenerServicio() {
         requireContext().stopService(Intent(requireContext(), MQTTService::class.java))
         actualizarBrokerEstado(BrokerEstado.DESCONECTADO.name)
-        actualizarModemEstado("DESCONECTADO")
+        actualizarModemEstado(getString(R.string.status_disconnected_upper))
+        indicatorEmail.setBackgroundResource(R.drawable.led_rojo)
+        txtEmailResumen.text = getString(R.string.email_summary_no_data)
+        txtEmailSmtp.text = getString(R.string.email_smtp_placeholder)
+        txtEmailPingLocal.text = getString(R.string.email_ping_local_placeholder)
+        txtEmailPingRemoto.text = getString(R.string.email_ping_remote_placeholder)
     }
 
-    // UI updates
+    // ---- UI updates
+
     private fun actualizarBrokerEstado(estado: String) {
-        txtBroker.text = "Broker: $estado"
+        txtBroker.text = getString(R.string.broker_status, estado)
         when (estado.uppercase(Locale.getDefault())) {
             BrokerEstado.CONECTADO.name -> {
                 indicatorBroker.setBackgroundResource(R.drawable.led_verde)
-                switchConnect.isChecked = true
+                // no tocar el switch
             }
+
             BrokerEstado.CONECTANDO.name, BrokerEstado.REINTENTANDO.name -> {
                 indicatorBroker.setBackgroundResource(R.drawable.led_naranja)
-                switchConnect.isChecked = true
             }
+
             BrokerEstado.ERROR.name, BrokerEstado.DESCONECTADO.name -> {
                 indicatorBroker.setBackgroundResource(R.drawable.led_rojo)
             }
+
             else -> indicatorBroker.setBackgroundResource(R.drawable.led_rojo)
         }
     }
 
     private fun actualizarModemEstado(estado: String) {
-        txtModem.text = "Modem: $estado"
+        txtModem.text = getString(R.string.modem_status, estado)
         if (estado.equals("CONECTADO", ignoreCase = true)) {
             indicatorModem.setBackgroundResource(R.drawable.led_verde)
         } else {
@@ -165,10 +222,55 @@ class MqttFragment : Fragment() {
         }
     }
 
+    private fun actualizarEmailEstado(json: String) {
+        try {
+            val root = JSONObject(json)
+            val defaultUnknown = getString(R.string.status_unknown)
+            val smtp = root.optString("smtp", defaultUnknown)
+            val pingLocal = root.optString("ping_local", defaultUnknown)
+            val pingRemoto = root.optString("ping_remoto", defaultUnknown)
+            val ts = root.optString("ts", "")
+
+            txtEmailSmtp.text = getString(R.string.email_smtp_format, formatearEstado(smtp))
+            txtEmailPingLocal.text =
+                getString(R.string.email_ping_local_format, formatearEstado(pingLocal))
+            txtEmailPingRemoto.text =
+                getString(R.string.email_ping_remote_format, formatearEstado(pingRemoto))
+
+            val estados = listOf(smtp, pingLocal, pingRemoto)
+            val resumen = when {
+                estados.any { it.equals("desconectado", ignoreCase = true) } -> {
+                    indicatorEmail.setBackgroundResource(R.drawable.led_rojo)
+                    getString(R.string.email_summary_no_service)
+                }
+                estados.any { it.equals("desconocido", ignoreCase = true) } -> {
+                    indicatorEmail.setBackgroundResource(R.drawable.led_naranja)
+                    getString(R.string.email_summary_unknown)
+                }
+                else -> {
+                    indicatorEmail.setBackgroundResource(R.drawable.led_verde)
+                    getString(R.string.email_summary_operational)
+                }
+            }
+            val sello = if (ts.isNotBlank()) " • $ts" else ""
+            txtEmailResumen.text = resumen + sello
+        } catch (e: Exception) {
+            Log.e("MqttFragment", "Error parseando estado correo: ${e.message}", e)
+        }
+    }
+
+    private fun formatearEstado(valor: String): String {
+        val base = valor.ifBlank { getString(R.string.status_unknown) }
+        val lower = base.lowercase(Locale.getDefault())
+        return lower.replaceFirstChar { ch ->
+            if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
+        }
+    }
+
     private fun actualizarGrado(porcentaje: Double) {
         val pctInt = porcentaje.coerceIn(0.0, 100.0).toInt()
         progressGrado.progress = pctInt
-        txtGradoPct.text = String.format(Locale.getDefault(), "%.1f%%", porcentaje)
+        txtGradoPct.text = getString(R.string.percent_format, porcentaje)
 
         val led = when {
             porcentaje < Thresholds.ROJO -> R.drawable.led_rojo
@@ -186,7 +288,7 @@ class MqttFragment : Fragment() {
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 val id = o.optInt("id")
-                val nombre = o.optString("nombre", "N/D")
+                val nombre = o.optString("nombre", getString(R.string.value_not_available))
                 val uc = o.optString("ultima_caida", "")
                 out.add(GrdDesconectado(id, nombre, uc))
             }

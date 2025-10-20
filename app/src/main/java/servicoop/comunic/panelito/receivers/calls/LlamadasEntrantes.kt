@@ -12,6 +12,7 @@ import android.provider.ContactsContract
 import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.services.mqtt.MqttPublisher
 
 class LlamadasEntrantes : BroadcastReceiver() {
@@ -144,14 +145,14 @@ class LlamadasEntrantes : BroadcastReceiver() {
                 "getContactName: SecurityException - Permiso READ_CONTACTS denegado para obtener nombre para $phoneNumber. ${e.message}",
                 e
             )
-            contactName = "Permiso denegado"
+            contactName = context.getString(R.string.contact_permission_denied)
         } catch (e: Exception) {
             Log.e(
                 "LlamadasEntrantes",
                 "getContactName: Error inesperado al obtener nombre de contacto para $phoneNumber: ${e.message}",
                 e
             )
-            contactName = "Error"
+            contactName = context.getString(R.string.contact_generic_error)
         } finally {
             cursor?.close()
         }

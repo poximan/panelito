@@ -9,7 +9,7 @@
         android:id="@+id/txt_equipo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Equipo"
+        android:text="@string/item_grd_equipment_label"
         android:textStyle="bold" />
 
     <LinearLayout
@@ -21,13 +21,13 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Ultima caida: " />
+            android:text="@string/item_grd_last_drop_label" />
 
         <TextView
             android:id="@+id/txt_ultima"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="N/D" />
+            android:text="@string/value_not_available" />
     </LinearLayout>
 
     <LinearLayout
@@ -39,12 +39,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="T.desc: " />
+            android:text="@string/item_grd_tdesc_label" />
 
         <TextView
             android:id="@+id/txt_tdesc"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="0m" />
+            android:text="@string/item_grd_default_elapsed" />
     </LinearLayout>
 </LinearLayout>
