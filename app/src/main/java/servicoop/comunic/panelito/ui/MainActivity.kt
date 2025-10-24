@@ -9,10 +9,13 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.data.datastore.SettingsDataStore
 import servicoop.comunic.panelito.domain.repository.SettingsRepository
-import servicoop.comunic.panelito.fragment.MqttFragment
+import servicoop.comunic.panelito.fragment.DashboardFragment
+import servicoop.comunic.panelito.fragment.ProxmoxFragment
 
 class MainActivity : AppCompatActivity() {
 
@@ -21,6 +24,7 @@ class MainActivity : AppCompatActivity() {
     // provider simple del repositorio para toda la UI
     lateinit var settingsRepo: SettingsRepository
         private set
+    private lateinit var viewPager: ViewPager2
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,12 +36,9 @@ class MainActivity : AppCompatActivity() {
         Log.d("MainActivity", "onCreate: Solicitando permisos.")
         requestPermissions()
 
-        if (savedInstanceState == null) {
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, MqttFragment.newInstance())
-                .commit()
-            Log.d("MainActivity", "onCreate: MqttFragment agregado.")
-        }
+        viewPager = findViewById(R.id.view_pager)
+        viewPager.adapter = MainPagerAdapter(this)
+        viewPager.offscreenPageLimit = 1
     }
 
     private fun requestPermissions() {
@@ -123,6 +124,15 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             }
+        }
+    }
+
+    private class MainPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
+        override fun getItemCount(): Int = 2
+
+        override fun createFragment(position: Int) = when (position) {
+            0 -> DashboardFragment.newInstance()
+            else -> ProxmoxFragment.newInstance()
         }
     }
 }

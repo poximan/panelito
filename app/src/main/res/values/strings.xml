@@ -38,6 +38,22 @@
     <string name="status_connected_capitalized">Conectado</string>
     <string name="status_reconnected_capitalized">Reconectado</string>
     <string name="status_unknown_capitalized">Desconocido</string>
+    <string name="proxmox_status_online">Hipervisor Proxmox en línea</string>
+    <string name="proxmox_status_offline">Hipervisor Proxmox no responde</string>
+    <string name="proxmox_updated_at">Actualizado: %1$s</string>
+    <string name="proxmox_node_label">Nodo: %1$s</string>
+    <string name="proxmox_missing">VM sin datos: %1$s</string>
+    <string name="proxmox_empty">Sin datos disponibles</string>
+    <string name="proxmox_vm_name_format">VM %1$d · %2$s</string>
+    <string name="proxmox_cpu_label">CPU</string>
+    <string name="proxmox_memory_label">Memoria</string>
+    <string name="proxmox_disk_label">Disco</string>
+    <string name="proxmox_cpu_value">%.1f %%</string>
+    <string name="proxmox_memory_value" formatted="false">%.1f / %.1f GB (%.0f%%)</string>
+    <string name="proxmox_disk_value" formatted="false">%.1f / %.1f GB (%.0f%%)</string>
+    <string name="proxmox_cpus_label">vCPU: %1$d</string>
+    <string name="proxmox_uptime_label">Uptime: %1$s</string>
+
     <string name="percent_format">%.1f%%</string>
 
     <!-- Notifications and errors -->

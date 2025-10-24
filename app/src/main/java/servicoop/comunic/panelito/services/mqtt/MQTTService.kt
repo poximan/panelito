@@ -64,6 +64,8 @@ class MQTTService : Service(), MqttCallbackExtended {
         const val EXTRA_ERROR = "EXTRA_ERROR"
         const val ACTION_EMAIL_ESTADO = "$ACTION_PREFIX.ACTION_EMAIL_ESTADO"
         const val EXTRA_EMAIL_ESTADO = "EXTRA_EMAIL_ESTADO"
+        const val ACTION_PROXMOX_ESTADO = "$ACTION_PREFIX.ACTION_PROXMOX_ESTADO"
+        const val EXTRA_PROXMOX_ESTADO = "EXTRA_PROXMOX_ESTADO"
 
         // Pedido de estado desde UI
         const val EXTRA_SOLICITAR_ESTADO = "solicitar_estado"
@@ -99,6 +101,7 @@ class MQTTService : Service(), MqttCallbackExtended {
     private var lastGradoPct: Double? = null
     private var lastGrdsJson: String? = null
     private var lastEmailEstado: String? = null
+    private var lastProxmoxEstado: String? = null
     private var lastModemEstado: ModemEstado = ModemEstado.DESCONECTADO
     private var lastBrokerEstado: BrokerEstado = BrokerEstado.DESCONECTADO
     private var coalesceJob: Job? = null
@@ -220,6 +223,7 @@ class MQTTService : Service(), MqttCallbackExtended {
             mqttClient.subscribe(MqttConfig.TOPIC_GRADO, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_GRDS, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_EMAIL_ESTADO, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.TOPIC_PROXMOX_ESTADO, MqttConfig.QOS_SUBS)
 
             requestInitialState()
             Log.i("MQTTService", "Suscripto a topicos de estado")
@@ -262,6 +266,11 @@ class MQTTService : Service(), MqttCallbackExtended {
             MqttConfig.TOPIC_EMAIL_ESTADO -> {
                 lastEmailEstado = payload
                 enviarEmailEstado(payload)
+            }
+
+            MqttConfig.TOPIC_PROXMOX_ESTADO -> {
+                lastProxmoxEstado = payload
+                enviarProxmoxEstado(payload)
             }
         }
     }
@@ -414,7 +423,14 @@ class MQTTService : Service(), MqttCallbackExtended {
     }
 
     private fun enviarEmailEstado(jsonRaw: String) {
+        lastEmailEstado = jsonRaw
         val i = Intent(ACTION_EMAIL_ESTADO).apply { putExtra(EXTRA_EMAIL_ESTADO, jsonRaw) }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(i)
+    }
+
+    private fun enviarProxmoxEstado(jsonRaw: String) {
+        lastProxmoxEstado = jsonRaw
+        val i = Intent(ACTION_PROXMOX_ESTADO).apply { putExtra(EXTRA_PROXMOX_ESTADO, jsonRaw) }
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
     }
 
@@ -430,6 +446,7 @@ class MQTTService : Service(), MqttCallbackExtended {
         lastGradoPct?.let { enviarGrado(it) }
         lastGrdsJson?.let { enviarGrds(it) }
         lastEmailEstado?.let { enviarEmailEstado(it) }
+        lastProxmoxEstado?.let { enviarProxmoxEstado(it) }
     }
 
     private fun parseModemEstado(payload: String): ModemEstado {

@@ -25,6 +25,8 @@ object MqttConfig {
         "$BASE/estado/grds" // payload JSON: {"items":[{"id":11,"nombre":"...", "ultima_caida":"..."}], "ts":"..."}
     const val TOPIC_EMAIL_ESTADO =
         "$BASE/estado/email" // payload JSON: {"smtp":"conectado","ping_local":"...","ping_remoto":"...","ts":"..."}
+    const val TOPIC_PROXMOX_ESTADO =
+        "$BASE/estado/proxmox" // payload JSON: {"ts":"...","status":"online|offline","vms":[...],"missing":[...]}
 
     const val RPC_ROOT = "app/req"
 
