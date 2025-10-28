@@ -42,14 +42,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="vCPU: --"
+        android:text="@string/value_not_available"
         android:textSize="14sp" />
 
     <TextView
         android:id="@+id/txt_vm_uptime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Uptime: --"
+        android:text="@string/value_not_available"
         android:textSize="14sp" />
 
     <LinearLayout
@@ -120,38 +120,59 @@
             android:progress="0" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/txt_disk_total"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/value_not_available"
+        android:textStyle="bold"
+        android:textSize="14sp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:orientation="vertical">
+        android:orientation="horizontal">
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:orientation="horizontal">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/proxmox_disk_label"
+                android:text="@string/proxmox_disk_read_title"
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/txt_disk_value"
+                android:id="@+id/txt_disk_read_value"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/value_not_available" />
         </LinearLayout>
 
-        <ProgressBar
-            android:id="@+id/progress_disk"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_width="match_parent"
-            android:layout_height="12dp"
-            android:layout_marginTop="4dp"
-            android:max="100"
-            android:progress="0" />
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/proxmox_disk_write_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txt_disk_write_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/value_not_available" />
+        </LinearLayout>
+
     </LinearLayout>
 
 </LinearLayout>

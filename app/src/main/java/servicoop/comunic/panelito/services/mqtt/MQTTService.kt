@@ -1,4 +1,4 @@
-package servicoop.comunic.panelito.services.mqtt
+﻿package servicoop.comunic.panelito.services.mqtt
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -32,8 +32,10 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
+import servicoop.comunic.panelito.core.model.EmailEvent
 import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.data.mqtt.MqttConfig
+import java.util.ArrayList
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
@@ -66,19 +68,25 @@ class MQTTService : Service(), MqttCallbackExtended {
         const val EXTRA_EMAIL_ESTADO = "EXTRA_EMAIL_ESTADO"
         const val ACTION_PROXMOX_ESTADO = "$ACTION_PREFIX.ACTION_PROXMOX_ESTADO"
         const val EXTRA_PROXMOX_ESTADO = "EXTRA_PROXMOX_ESTADO"
+        const val ACTION_EMAIL_EVENT = "$ACTION_PREFIX.ACTION_EMAIL_EVENT"
+        const val EXTRA_EMAIL_EVENT = "EXTRA_EMAIL_EVENT"
+        const val EXTRA_EMAIL_EVENT_LIST = "EXTRA_EMAIL_EVENT_LIST"
 
         // Pedido de estado desde UI
         const val EXTRA_SOLICITAR_ESTADO = "solicitar_estado"
 
         // Accion opcional para publicar
-        const val ACTION_PUBLICAR = "$ACTION_PREFIX.ACTION_PUBLICAR"
+        const val ACTION_PUBLICAR = "\$ACTION_PREFIX.ACTION_PUBLICAR"
+        const val ACTION_RPC_EMAIL_TEST = "\$ACTION_PREFIX.ACTION_RPC_EMAIL_TEST"
         const val EXTRA_TOPIC_PUBLICAR = "EXTRA_TOPIC_PUBLICAR"
         const val EXTRA_MENSAJE_PUBLICAR = "EXTRA_MENSAJE_PUBLICAR"
         const val EXTRA_QOS_PUBLICAR = "EXTRA_QOS_PUBLICAR"
         const val EXTRA_RETAINED_PUBLICAR = "EXTRA_RETAINED_PUBLICAR"
+        private const val EMAIL_EVENT_BUFFER_LIMIT = 50
     }
+    private val emailEvents = mutableListOf<EmailEvent>()
 
-    private val brokerUrl = MqttConfig.BROKER_URL
+    private val brokerUrl: String by lazy { MqttConfig.brokerUrl(this) }
     private val clientId: String by lazy {
         val id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
         "Redirector_${id ?: "unknown"}"
@@ -110,18 +118,19 @@ class MQTTService : Service(), MqttCallbackExtended {
     @Volatile
     private var pendingGrds: String? = null
 
-    private val options = MqttConnectOptions().apply {
-        isCleanSession = true
-        isAutomaticReconnect = false
-        userName = MqttConfig.USERNAME
-        password = MqttConfig.PASSWORD.toCharArray()
-        connectionTimeout = 0
-        keepAliveInterval = MqttConfig.KEEP_ALIVE_SECONDS
-        maxInflight = 4
-    }
+    private lateinit var options: MqttConnectOptions
 
     override fun onCreate() {
         super.onCreate()
+        options = MqttConnectOptions().apply {
+            isCleanSession = true
+            isAutomaticReconnect = false
+            userName = MqttConfig.username(this@MQTTService)
+            password = MqttConfig.password(this@MQTTService).toCharArray()
+            connectionTimeout = 0
+            keepAliveInterval = MqttConfig.KEEP_ALIVE_SECONDS
+            maxInflight = 4
+        }
         crearCanalNotificacion()
         iniciarEnPrimerPlano(getString(R.string.notification_text_broker_disconnected))
 
@@ -170,8 +179,16 @@ class MQTTService : Service(), MqttCallbackExtended {
             if (!topic.isNullOrBlank() && message != null) {
                 publish(topic, message, qos, retained)
             } else {
-            sendError(getString(R.string.error_publication_missing_data))
+                sendError(getString(R.string.error_publication_missing_data))
             }
+            return START_STICKY
+        }
+
+        if (action == ACTION_RPC_EMAIL_TEST) {
+            val params = JSONObject().apply {
+                put("origin", "panelito")
+            }
+            sendRpcRequest("send_email_test", MqttConfig.TOPIC_EMAIL_EVENT, params)
             return START_STICKY
         }
 
@@ -224,6 +241,7 @@ class MQTTService : Service(), MqttCallbackExtended {
             mqttClient.subscribe(MqttConfig.TOPIC_GRDS, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_EMAIL_ESTADO, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_PROXMOX_ESTADO, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.TOPIC_EMAIL_EVENT, MqttConfig.QOS_SUBS)
 
             requestInitialState()
             Log.i("MQTTService", "Suscripto a topicos de estado")
@@ -246,19 +264,48 @@ class MQTTService : Service(), MqttCallbackExtended {
 
             MqttConfig.TOPIC_GRADO -> {
                 try {
-                    val o = JSONObject(payload)
-                    val pct = o.optDouble("porcentaje", Double.NaN)
+                    val parsed = JSONObject(payload)
+                    if (parsed.optString("type").equals("rpc", ignoreCase = true)) {
+                        if (parsed.optString("action").equals("get_global_status", ignoreCase = true)) {
+                            if (parsed.optBoolean("ok", true)) {
+                                val pct = parsed.optJSONObject("data")
+                                    ?.optJSONObject("summary")
+                                    ?.optDouble("porcentaje", Double.NaN)
+                                if (pct != null && !pct.isNaN()) {
+                                    pendingGrado = pct
+                                    coalesceUi()
+                                }
+                            } else {
+                                val detail = parsed.optString("error", getString(R.string.status_unknown))
+                                sendError(getString(R.string.error_rpc_global_status, detail))
+                            }
+                        }
+                        return
+                    }
+                    val pct = parsed.optDouble("porcentaje", Double.NaN)
                     if (!pct.isNaN()) {
                         pendingGrado = pct
                         coalesceUi()
                     }
                 } catch (e: Exception) {
-            val detail = e.message ?: getString(R.string.status_unknown)
-            sendError(getString(R.string.error_parse_grade, detail))
+                    val detail = e.message ?: getString(R.string.status_unknown)
+                    sendError(getString(R.string.error_parse_grade, detail))
                 }
             }
 
             MqttConfig.TOPIC_GRDS -> {
+                try {
+                    val parsed = JSONObject(payload)
+                    if (parsed.optString("type").equals("rpc", ignoreCase = true)) {
+                        if (!parsed.optBoolean("ok", true)) {
+                            val detail = parsed.optString("error", getString(R.string.status_unknown))
+                            sendError(getString(R.string.error_rpc_global_status, detail))
+                        }
+                        return
+                    }
+                } catch (_: Exception) {
+                    // fallback: si no es JSON valido, continuar con payload crudo
+                }
                 pendingGrds = payload
                 coalesceUi()
             }
@@ -271,6 +318,22 @@ class MQTTService : Service(), MqttCallbackExtended {
             MqttConfig.TOPIC_PROXMOX_ESTADO -> {
                 lastProxmoxEstado = payload
                 enviarProxmoxEstado(payload)
+            }
+
+            MqttConfig.TOPIC_EMAIL_EVENT -> {
+                try {
+                    val parsed = JSONObject(payload)
+                    val event = EmailEvent(
+                        type = parsed.optString("type", "email"),
+                        subject = parsed.optString("subject", getString(R.string.value_not_available)),
+                        ok = parsed.optBoolean("ok", false),
+                        timestamp = parsed.optString("ts", "")
+                    )
+                    registrarEmailEvent(event)
+                } catch (e: Exception) {
+                    val detail = e.message ?: getString(R.string.status_unknown)
+                    sendError(getString(R.string.error_parse_email_event, detail))
+                }
             }
         }
     }
@@ -434,6 +497,26 @@ class MQTTService : Service(), MqttCallbackExtended {
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
     }
 
+    private fun registrarEmailEvent(event: EmailEvent) {
+        emailEvents.add(0, event)
+        if (emailEvents.size > EMAIL_EVENT_BUFFER_LIMIT) {
+            emailEvents.removeAt(emailEvents.lastIndex)
+        }
+        val intent = Intent(ACTION_EMAIL_EVENT).apply {
+            putExtra(EXTRA_EMAIL_EVENT, event)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+    }
+
+    private fun emitirEmailEventosCache() {
+        if (emailEvents.isEmpty()) return
+        val snapshot = ArrayList(emailEvents)
+        val intent = Intent(ACTION_EMAIL_EVENT).apply {
+            putExtra(EXTRA_EMAIL_EVENT_LIST, snapshot)
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+    }
+
     private fun sendError(msg: String) {
         val i = Intent(ACTION_ERROR).apply { putExtra(EXTRA_ERROR, msg) }
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
@@ -447,6 +530,7 @@ class MQTTService : Service(), MqttCallbackExtended {
         lastGrdsJson?.let { enviarGrds(it) }
         lastEmailEstado?.let { enviarEmailEstado(it) }
         lastProxmoxEstado?.let { enviarProxmoxEstado(it) }
+        emitirEmailEventosCache()
     }
 
     private fun parseModemEstado(payload: String): ModemEstado {
@@ -480,11 +564,11 @@ class MQTTService : Service(), MqttCallbackExtended {
         sendRpcRequest("get_modem_status", MqttConfig.TOPIC_MODEM_CONEXION)
     }
 
-    private fun sendRpcRequest(action: String, replyTo: String) {
+    private fun sendRpcRequest(action: String, replyTo: String, params: JSONObject? = null) {
         val payload = JSONObject().apply {
             put("reply_to", replyTo)
             put("corr", UUID.randomUUID().toString())
-            put("params", JSONObject())
+            put("params", params ?: JSONObject())
         }.toString()
         publish("${MqttConfig.RPC_ROOT}/$action", payload, qos = 1, retained = false)
     }
@@ -504,3 +588,5 @@ class MQTTService : Service(), MqttCallbackExtended {
         }
     }
 }
+
+

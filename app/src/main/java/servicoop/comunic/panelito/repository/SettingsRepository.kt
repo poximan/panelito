@@ -1,4 +1,4 @@
-package servicoop.comunic.panelito.domain.repository
+package servicoop.comunic.panelito.repository
 
 import kotlinx.coroutines.flow.Flow
 

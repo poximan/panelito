@@ -18,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView
 import org.json.JSONArray
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.ProxmoxState
 import servicoop.comunic.panelito.core.model.ProxmoxVm
 import servicoop.comunic.panelito.services.mqtt.MQTTService
@@ -43,11 +44,19 @@ class ProxmoxFragment : Fragment() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == MQTTService.ACTION_PROXMOX_ESTADO) {
-                val raw = intent.getStringExtra(MQTTService.EXTRA_PROXMOX_ESTADO) ?: return
-                Log.d("ProxmoxFragment", "Estado recibido (${raw.length} chars)")
-                lastPayload = raw
-                parseAndRender(raw)
+            when (intent?.action) {
+                MQTTService.ACTION_PROXMOX_ESTADO -> {
+                    val raw = intent.getStringExtra(MQTTService.EXTRA_PROXMOX_ESTADO) ?: return
+                    Log.d("ProxmoxFragment", "Estado recibido (${raw.length} chars)")
+                    lastPayload = raw
+                    parseAndRender(raw)
+                }
+                MQTTService.ACTION_BROKER_ESTADO -> {
+                    val estado = intent.getStringExtra(MQTTService.EXTRA_BROKER_ESTADO) ?: return
+                    if (!estado.equals(BrokerEstado.CONECTADO.name, ignoreCase = true)) {
+                        showOfflineState()
+                    }
+                }
             }
         }
     }
@@ -83,7 +92,10 @@ class ProxmoxFragment : Fragment() {
         super.onStart()
         LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
             receiver,
-            IntentFilter(MQTTService.ACTION_PROXMOX_ESTADO)
+            IntentFilter().apply {
+                addAction(MQTTService.ACTION_PROXMOX_ESTADO)
+                addAction(MQTTService.ACTION_BROKER_ESTADO)
+            }
         )
         lastPayload?.let { parseAndRender(it) }
     }
@@ -96,6 +108,18 @@ class ProxmoxFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         lastPayload?.let { outState.putString(KEY_LAST_PAYLOAD, it) }
+    }
+
+    private fun showOfflineState() {
+        lastPayload = null
+        statusIndicator.setBackgroundResource(R.drawable.led_rojo)
+        statusText.text = getString(R.string.proxmox_status_offline)
+        nodeText.isVisible = false
+        updatedText.isVisible = false
+        missingText.isVisible = false
+        adapter.submitList(emptyList())
+        recycler.isVisible = false
+        emptyView.isVisible = true
     }
 
     private fun parseAndRender(raw: String) {
@@ -135,6 +159,12 @@ class ProxmoxFragment : Fragment() {
             val memTotal = vmObj.optDouble("mem_total_gb", 0.0)
             val diskUsed = vmObj.optDouble("disk_used_gb", 0.0)
             val diskTotal = vmObj.optDouble("disk_total_gb", 0.0)
+            val diskPct = vmObj.optDouble("disk_pct", Double.NaN).takeUnless { it.isNaN() }
+            val diskReadBytes = vmObj.optDouble("disk_read_bytes", 0.0)
+            val diskWriteBytes = vmObj.optDouble("disk_write_bytes", 0.0)
+            val diskReadRate = vmObj.optDouble("disk_read_rate_bps", 0.0)
+            val diskWriteRate = vmObj.optDouble("disk_write_rate_bps", 0.0)
+            val memPct = vmObj.optDouble("mem_pct", Double.NaN).takeUnless { it.isNaN() }
             val uptime = vmObj.optString("uptime_human", "0m")
 
             vms.add(
@@ -147,8 +177,14 @@ class ProxmoxFragment : Fragment() {
                     cpuPct = cpuPct,
                     memUsedGb = memUsed,
                     memTotalGb = memTotal,
+                    memPct = memPct,
                     diskUsedGb = diskUsed,
                     diskTotalGb = diskTotal,
+                    diskPct = diskPct,
+                    diskReadBytes = diskReadBytes,
+                    diskWriteBytes = diskWriteBytes,
+                    diskReadRateBps = diskReadRate,
+                    diskWriteRateBps = diskWriteRate,
                     uptime = uptime
                 )
             )
@@ -201,8 +237,9 @@ class ProxmoxFragment : Fragment() {
             else -> missingText.isVisible = false
         }
 
-        adapter.submitList(state.vms)
-        recycler.isVisible = state.vms.isNotEmpty()
-        emptyView.isVisible = state.vms.isEmpty()
+        val ordered = state.vms.sortedBy { it.vmid }
+        adapter.submitList(ordered)
+        recycler.isVisible = ordered.isNotEmpty()
+        emptyView.isVisible = ordered.isEmpty()
     }
 }

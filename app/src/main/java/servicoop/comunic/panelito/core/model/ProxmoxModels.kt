@@ -9,8 +9,14 @@ data class ProxmoxVm(
     val cpuPct: Double,
     val memUsedGb: Double,
     val memTotalGb: Double,
+    val memPct: Double?,
     val diskUsedGb: Double,
     val diskTotalGb: Double,
+    val diskPct: Double?,
+    val diskReadBytes: Double,
+    val diskWriteBytes: Double,
+    val diskReadRateBps: Double,
+    val diskWriteRateBps: Double,
     val uptime: String
 )
 

@@ -9,35 +9,6 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Control y estado del BROKER (local) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <Switch
-                android:id="@+id/switch_connect"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/switch_connect_broker" />
-
-            <View
-                android:id="@+id/indicator_broker"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:layout_marginStart="12dp"
-                android:background="@drawable/led_rojo" />
-
-            <TextView
-                android:id="@+id/txt_broker"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="@string/broker_status_placeholder"
-                android:textSize="16sp" />
-        </LinearLayout>
-
         <!-- Estado del MODEM (remoto) -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -60,56 +31,6 @@
                 android:text="@string/modem_status_placeholder"
                 android:textSize="16sp" />
         </LinearLayout>
-
-        <!-- Estado del servidor de correo -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <View
-                android:id="@+id/indicator_email"
-                android:layout_width="20dp"
-                android:layout_height="20dp"
-                android:background="@drawable/led_rojo" />
-
-            <TextView
-                android:id="@+id/txt_email_resumen"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:text="@string/email_summary_placeholder"
-                android:textSize="16sp" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/txt_email_smtp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="32dp"
-            android:layout_marginTop="10dp"
-            android:text="@string/email_smtp_placeholder"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/txt_email_ping_local"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="32dp"
-            android:layout_marginTop="10dp"
-            android:text="@string/email_ping_local_placeholder"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/txt_email_ping_remoto"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="32dp"
-            android:layout_marginTop="10dp"
-            android:text="@string/email_ping_remote_placeholder"
-            android:textSize="14sp" />
 
         <!-- Grado conectividad -->
         <TextView

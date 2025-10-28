@@ -1,10 +1,13 @@
 package servicoop.comunic.panelito.data.mqtt
 
+import android.content.Context
+import servicoop.comunic.panelito.R
+
 object MqttConfig {
     // Conexion
-    const val BROKER_URL = "ssl://a4f7b92509244483b210b9f1f69bcc37.s1.eu.hivemq.cloud:8883"
-    const val USERNAME = "comunicaciones"
-    const val PASSWORD = "comuniC4ciones"
+    fun brokerUrl(context: Context): String = context.getString(R.string.mqtt_broker_url)
+    fun username(context: Context): String = context.getString(R.string.mqtt_broker_username)
+    fun password(context: Context): String = context.getString(R.string.mqtt_broker_password)
 
     // Ajustes energeticos
     // Mantener 300s suele balancear NAT timeouts vs. pings (tuneable segun carrier).
@@ -27,6 +30,8 @@ object MqttConfig {
         "$BASE/estado/email" // payload JSON: {"smtp":"conectado","ping_local":"...","ping_remoto":"...","ts":"..."}
     const val TOPIC_PROXMOX_ESTADO =
         "$BASE/estado/proxmox" // payload JSON: {"ts":"...","status":"online|offline","vms":[...],"missing":[...]}
+    const val TOPIC_EMAIL_EVENT =
+        "$BASE/eventos/email" // payload JSON: {"type":"email","subject":"...","ok":true,"ts":"..."}
 
     const val RPC_ROOT = "app/req"
 

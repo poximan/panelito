@@ -8,7 +8,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import servicoop.comunic.panelito.domain.repository.SettingsRepository
+import servicoop.comunic.panelito.repository.SettingsRepository
 
 /**
  * Implementacion de SettingsRepository con Preferences DataStore.
