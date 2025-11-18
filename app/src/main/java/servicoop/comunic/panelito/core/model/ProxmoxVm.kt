@@ -19,12 +19,3 @@ data class ProxmoxVm(
     val diskWriteRateBps: Double,
     val uptime: String
 )
-
-data class ProxmoxState(
-    val status: String,
-    val timestamp: String,
-    val node: String,
-    val error: String?,
-    val missing: List<Int>,
-    val vms: List<ProxmoxVm>
-)

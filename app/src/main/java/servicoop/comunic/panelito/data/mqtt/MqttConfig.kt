@@ -1,4 +1,4 @@
-package servicoop.comunic.panelito.data.mqtt
+﻿package servicoop.comunic.panelito.data.mqtt
 
 import android.content.Context
 import servicoop.comunic.panelito.R
@@ -32,9 +32,20 @@ object MqttConfig {
         "$BASE/estado/proxmox" // payload JSON: {"ts":"...","status":"online|offline","vms":[...],"missing":[...]}
     const val TOPIC_EMAIL_EVENT =
         "$BASE/eventos/email" // payload JSON: {"type":"email","subject":"...","ok":true,"ts":"..."}
+    const val TOPIC_SERVICE_STATUS = "panelexemys/status" // payload JSON: {"status":"online|offline","ts":"...","reason":"..."}
+
+    // Publicaciones directas de charo-daemon por host (para N instancias)
+    // Panelito se alimenta exclusivamente de estos topicos para la vista de charo-daemon.
+    const val TOPIC_CHARODAEMON_STATUS = "charodaemon/host/+/status"
+    const val TOPIC_CHARODAEMON_METRICS = "charodaemon/host/+/metrics"
+    const val TOPIC_CHARITO_WHITELIST = "charito/whitelist/instances"
 
     const val RPC_ROOT = "app/req"
 
     // QoS recomendado
     const val QOS_SUBS = 1
 }
+
+
+
+

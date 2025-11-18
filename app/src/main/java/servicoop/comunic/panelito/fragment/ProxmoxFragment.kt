@@ -21,6 +21,7 @@ import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.ProxmoxState
 import servicoop.comunic.panelito.core.model.ProxmoxVm
+import servicoop.comunic.panelito.core.util.TimestampFormatter
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.adapter.ProxmoxVmAdapter
 
@@ -55,6 +56,14 @@ class ProxmoxFragment : Fragment() {
                     val estado = intent.getStringExtra(MQTTService.EXTRA_BROKER_ESTADO) ?: return
                     if (!estado.equals(BrokerEstado.CONECTADO.name, ignoreCase = true)) {
                         showOfflineState()
+                    }
+                }
+                MQTTService.ACTION_BACKEND_STATUS -> {
+                    val estado = intent.getStringExtra(MQTTService.EXTRA_BACKEND_STATUS) ?: return
+                    if (!estado.equals(MQTTService.STATUS_ONLINE, ignoreCase = true)) {
+                        showBackendUnknownState()
+                    } else {
+                        lastPayload?.let { parseAndRender(it) }
                     }
                 }
             }
@@ -95,6 +104,7 @@ class ProxmoxFragment : Fragment() {
             IntentFilter().apply {
                 addAction(MQTTService.ACTION_PROXMOX_ESTADO)
                 addAction(MQTTService.ACTION_BROKER_ESTADO)
+                addAction(MQTTService.ACTION_BACKEND_STATUS)
             }
         )
         lastPayload?.let { parseAndRender(it) }
@@ -114,6 +124,18 @@ class ProxmoxFragment : Fragment() {
         lastPayload = null
         statusIndicator.setBackgroundResource(R.drawable.led_rojo)
         statusText.text = getString(R.string.proxmox_status_offline)
+        nodeText.isVisible = false
+        updatedText.isVisible = false
+        missingText.isVisible = false
+        adapter.submitList(emptyList())
+        recycler.isVisible = false
+        emptyView.isVisible = true
+    }
+
+    private fun showBackendUnknownState() {
+        lastPayload = null
+        statusIndicator.setBackgroundResource(R.drawable.led_naranja)
+        statusText.text = getString(R.string.proxmox_status_unknown)
         nodeText.isVisible = false
         updatedText.isVisible = false
         missingText.isVisible = false
@@ -217,9 +239,10 @@ class ProxmoxFragment : Fragment() {
             nodeText.isVisible = false
         }
 
-        if (state.timestamp.isNotBlank()) {
+        val normalizedTs = TimestampFormatter.format(state.timestamp, "")
+        if (normalizedTs.isNotBlank()) {
             updatedText.isVisible = true
-            updatedText.text = getString(R.string.proxmox_updated_at, state.timestamp)
+            updatedText.text = getString(R.string.proxmox_updated_at, normalizedTs)
         } else {
             updatedText.isVisible = false
         }

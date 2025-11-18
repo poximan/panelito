@@ -2,16 +2,15 @@
     <string name="app_name">Panelito</string>
 
     <!-- UI labels -->
-    <string name="mqtt_broker_url" translatable="false">ssl://broker.example.com:8883</string>
-    <string name="mqtt_broker_username" translatable="false">usuario</string>
-    <string name="mqtt_broker_password" translatable="false">contrasenaEjemplo</string>
+    <string name="mqtt_broker_url" translatable="false">ssl://broker-ejemplo.fake.cloud:8883</string>
+    <string name="mqtt_broker_username" translatable="false">usuario_demo</string>
+    <string name="mqtt_broker_password" translatable="false">clave1234</string>
     <string name="switch_connect_broker">Conectar broker</string>
     <string name="broker_status_placeholder">Broker: DESCONECTADO</string>
     <string name="modem_status_placeholder">Modem: desconectado</string>
-    <string name="email_summary_placeholder">Email: --</string>
-    <string name="email_smtp_placeholder">SMTP en host LAN (post.example.com): --</string>
-    <string name="email_ping_local_placeholder">Ping IPPUB gw local (example.com): --</string>
-    <string name="email_ping_remote_placeholder">Ping IPPUB serv remoto (mail.example.com): --</string>
+    <string name="email_smtp_placeholder">SMTP en host LAN (smtp.ejemplo.org): --</string>
+    <string name="email_ping_local_placeholder">Ping IPPUB gw local (ejemplo.org): --</string>
+    <string name="email_ping_remote_placeholder">Ping IPPUB serv remoto (mail.ejemplo.org): --</string>
     <string name="grade_connectivity_title">Grado conectividad</string>
     <string name="grade_percentage_placeholder">0.0%</string>
     <string name="disconnected_list_title">Actualmente desconectados</string>
@@ -32,9 +31,9 @@
     <string name="email_summary_no_service">Email: sin servicio</string>
     <string name="email_summary_unknown">Email: indeterminado</string>
     <string name="email_summary_operational">Email: operativo</string>
-    <string name="email_smtp_format">SMTP en host LAN (post.example.com): %1$s</string>
-    <string name="email_ping_local_format">Ping IPPUB gw local (example.com): %1$s</string>
-    <string name="email_ping_remote_format">Ping IPPUB serv remoto (mail.example.com): %1$s</string>
+    <string name="email_smtp_format">SMTP en host LAN (smtp.ejemplo.org): %1$s</string>
+    <string name="email_ping_local_format">Ping IPPUB gw local (ejemplo.org): %1$s</string>
+    <string name="email_ping_remote_format">Ping IPPUB serv remoto (mail.ejemplo.org): %1$s</string>
     <string name="status_unknown">desconocido</string>
     <string name="status_disconnected_upper">DESCONECTADO</string>
     <string name="status_disconnected_capitalized">Desconectado</string>
@@ -48,16 +47,17 @@
     <string name="proxmox_missing">VM sin datos: %1$s</string>
     <string name="proxmox_empty">Sin datos disponibles</string>
     <string name="proxmox_vm_name_format">VM %1$d · %2$s</string>
-    <string name="proxmox_cpu_label">CPU:\u0020</string>
-    <string name="proxmox_memory_label">Memoria:\u0020</string>
+    <string name="proxmox_cpu_label">CPU: </string>
+    <string name="proxmox_memory_label">Memoria: </string>
     <string name="proxmox_cpu_value">%.1f %%</string>
     <string name="proxmox_memory_value">%1$.1f / %2$.1f GB (%3$.0f%%)</string>
     <string name="proxmox_disk_total">Disco asignado: %.1f GB</string>
     <string name="proxmox_disk_total_unknown">Disco asignado: N/D</string>
-    <string name="proxmox_disk_read_title">Lectura\u0020</string>
-    <string name="proxmox_disk_write_title">Escritura\u0020</string>
-    <string name="proxmox_disk_rate_value">%1$.1f %2$s/s</string>
-    <string name="proxmox_disk_rate_zero">0 KB/s</string>
+    <string name="proxmox_disk_read_title">Lectura </string>
+    <string name="proxmox_disk_write_title">Escritura </string>
+    <string name="proxmox_disk_rate_value">%1$.1f %2$s</string>
+    <string name="proxmox_disk_rate_zero">0 KB</string>
+    <string name="proxmox_status_unknown">Hipervisor Proxmox indeterminado</string>
     <string name="proxmox_cpus_label">vCPU: %1$d</string>
     <string name="proxmox_uptime_label">Uptime: %1$s</string>
     <string name="email_events_title">Eventos de correo</string>
@@ -70,8 +70,6 @@
     <!-- Notifications and errors -->
     <string name="notification_channel_name">MQTT Service Notifications</string>
     <string name="notification_text_broker_disconnected">Desconectado del broker MQTT</string>
-    <string name="notification_text_no_network_title">Sin conexion de red</string>
-    <string name="notification_text_no_network_body">Esperando red...</string>
     <string name="notification_text_service_stopped_title">Servicio MQTT detenido</string>
     <string name="notification_text_service_stopped_body">@string/status_disconnected_capitalized</string>
     <string name="notification_text_reconnecting_title">Reconectando...</string>
@@ -92,68 +90,104 @@
     <string name="error_publish_topic">Error publicando en %1$s: %2$s</string>
 
     <!-- Contacts -->
-    <string name="contact_permission_denied">Permiso denegado</string>
-    <string name="contact_generic_error">Error</string>
-    <string name="cheat_sheet_title">Cheat Sheet</string>
-    <string name="cheat_sheet_hint">Escribe tus notas de ayuda memoria…</string>
     <string name="cheat_sheet_visit">Visitar</string>
     <string name="cheat_sheet_ping">Ping</string>
-    <string name="cheat_sheet_ping_placeholder">Ejecutá una prueba para ver resultados.</string>
-    <string name="cheat_sheet_ping_running">Ejecutando ping…</string>
+    <string name="cheat_sheet_ping_placeholder">Ejecuta una prueba para ver resultados.</string>
+    <string name="cheat_sheet_ping_running">Ejecutando ping</string>
     <string name="cheat_sheet_ping_no_output_success">Ping completado sin salida disponible.</string>
     <string name="cheat_sheet_ping_timeout">Ping sin respuesta (timeout).</string>
-    <string name="cheat_sheet_ping_error_exit">Ping finalizó con código %1$d.</string>
+    <string name="cheat_sheet_ping_error_exit">Ping finaliza con codigo %1$d.</string>
     <string name="cheat_sheet_ping_error_generic">No se pudo ejecutar ping a %1$s.</string>
     <string name="cheat_sheet_ping_error_detail">Error ejecutando ping: %1$s</string>
     <string name="cheat_sheet_open_url_error">No se pudo abrir el navegador.</string>
     <string name="cheat_sheet_tw_title">firewall NGFWs fortigate TW</string>
     <string name="cheat_sheet_pm_title">vpn portal PM</string>
-    <string name="cheat_sheet_tw_url" translatable="false">https://example.com:8443</string>
-    <string name="cheat_sheet_tw_ip" translatable="false">192.0.2.10</string>
-    <string name="cheat_sheet_pm_url" translatable="false">https://vpn.example.com/</string>
-    <string name="cheat_sheet_pm_ip" translatable="false">198.51.100.5</string>
+    <string name="cheat_sheet_modem_telef_title">modem telef.</string>
+    <string name="cheat_sheet_tw_url" translatable="false">https://10.10.10.10:8443</string>
+    <string name="cheat_sheet_tw_ip" translatable="false">10.10.10.10</string>
+    <string name="cheat_sheet_pm_url" translatable="false">https://vpn.ejemplo.org/</string>
+    <string name="cheat_sheet_pm_ip" translatable="false">10.10.10.20</string>
+    <string name="cheat_sheet_modem_telef_host" translatable="false">10.10.10.30</string>
+    <string name="cheat_sheet_tcp_probe">Probar puerto TCP</string>
+    <string name="cheat_sheet_tcp_placeholder">Sin prueba realizada.</string>
+    <string name="cheat_sheet_tcp_running">Probando puerto...</string>
+    <string name="cheat_sheet_tcp_open">Puerto %1$d abierto</string>
+    <string name="cheat_sheet_tcp_closed">Puerto %1$d cerrado</string>
+    <string name="cheat_sheet_tcp_unknown">No se pudo determinar el estado del puerto.</string>
+    <string name="cheat_sheet_tcp_target">%1$s:%2$d</string>
     <string name="cheat_sheet_notes" translatable="false">
-\n
-        vpn-ejemplo-telefonica\n
-        \t\t\t192.0.2.10\n
-        \t\t\tproveedor\n
-        \t\t\tusuario@dominio.com\n
-\n
-        vpn-ejemplo-2\n
-        \t\t\t198.51.100.20\n
-        \t\t\tproveedor\n
-        \t\t\tusuario@dominio.com\n
-        \t\t\tIP PC: 192.0.2.50\n
-\n
-        vpn-portal-scada\n
-        \t\t\t203.0.113.11   descripcion ejemplo\n
-        \t\t\tscada\n
-        \t\t\tusuario_ejemplo\n
-\n
-        \t\t\t203.0.113.12    red ejemplo\n
-        \t\t\tscada\n
-        \t\t\tusuario_ejemplo\n
-\n
-        \t\t\t198.51.100.66\n
-        \t\t\telectromecanica\n
-        \t\t\tclave_ejemplo\n
-\n
-        \t\t\t198.51.100.77\n
-        \t\t\telectrico\n
-        \t\t\tclave_ejemplo\n
-        \t\t\tvnc     10.10.3.9 / clave_vnc_ejemplo\n
-\n
-        vpn por nodo ejemplo\n
-        \t\t\t138.59.0.41\n
-        \t\t\tvpn-ejemplo\n
-        \t\t\ttele-ejemplo\n
-\n
-        Se conecta al router - red de energia\n
-        Mediante escritorio remoto conectar al Work-02  a la IP 192.0.2.144,\n
-        una vez en esta maquina  hacer VNC al SCADA 10.10.3.2
+
+        vpn-tw-rebomb-telefonica
+        			10.10.10.10
+        			usuario1
+        			clave1
+
+        vpn-tw-rebomb
+        			10.10.10.11
+        			usuario2
+        			clave2
+        			IP PC: 192.168.0.10
+
+        vpn-pm-font-scada
+        			10.10.10.20   enlace1
+        			usuario3
+        			clave3
+
+        			10.10.10.21    red interna
+        			usuario4
+        			clave4
+
+        			10.10.10.22
+        			usuario5
+        			clave5
+
+        			10.10.10.23
+        			usuario6
+        			clave6
+        			vnc     10.10.10.50 / clave7
+
+        vpn por nodo net ejemplo
+        			10.10.10.40
+        			usuario7
+        			clave8
+
+        Se conecta al router de ejemplo - red de energia
+        Mediante escritorio remoto conectar al Work-02  a la IP 192.1.1.1,
+        una vez en esta maquina  hacer VNC al SCADA 10.10.10.2
     </string>
 
     <string name="email_test_button">Probar email</string>
     <string name="email_test_disabled">Broker desconectado</string>
-    <string name="email_test_sent">Solicitando prueba de email…</string>
-</resources>
+    <string name="email_test_sent">Solicitando prueba de email</string>
+    <!-- charo-daemon metrics -->
+    <string name="charo_list_empty">Sin datos recibidos de charo-daemon.</string>
+    <string name="charo_instance_unknown_id">(sin id)</string>
+    <string name="charo_time_unknown">Fecha no disponible</string>
+    <string name="charo_status_online_short">Online</string>
+    <string name="charo_status_offline_short">Offline</string>
+    <string name="charo_status_unknown_short">Desconocido</string>
+    <string name="charo_row_window">%1$ds</string>
+    <string name="charo_cpu_value">CPU %.1f%%</string>
+    <string name="charo_cpu_na">CPU N/D</string>
+    <string name="charo_mem_value">Mem %.1f%%</string>
+    <string name="charo_mem_na">Mem N/D</string>
+    <string name="charo_row_summary">%1$s &#8226; %2$s &#8226; %3$s &#8226; %4$s &#8226; %5$s</string>
+    <string name="charo_row_status_with_summary">%1$s &#8226; %2$s</string>
+    <string name="charo_status_label_prefix">Estado: %1$s</string>
+    <string name="error_parse_charo_metrics">Error parseando metricas de charo-daemon: %1$s</string>
+    <string name="error_parse_backend_status">Error parseando estado del backend: %1$s</string>
+    <string name="charo_tile_updated_at">Actualizado: %1$s</string>
+    <string name="charo_tile_window_format">%1$s &#8226; Ventana %2$ds</string>
+    <string name="charo_tile_cpu_label">CPU</string>
+    <string name="charo_tile_memory_label">Memoria</string>
+    <string name="charo_process_section_title">Procesos monitoreados</string>
+    <string name="charo_process_empty">Sin datos de procesos</string>
+    <string name="charo_process_state_active">activo</string>
+    <string name="charo_process_state_stopped">detenido</string>
+    <string name="charo_process_state_unknown">!datos</string>
+    <string name="charo_process_chip_text">%1$s\n%2$s</string>
+    <plurals name="charo_row_samples">
+        <item quantity="one">%d muestra</item>
+        <item quantity="other">%d muestras</item>
+    </plurals>
+</resources

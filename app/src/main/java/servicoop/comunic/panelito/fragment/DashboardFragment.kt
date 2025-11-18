@@ -32,6 +32,7 @@ class DashboardFragment : Fragment() {
     private lateinit var indicatorSalud: View
     private lateinit var rvGrds: RecyclerView
     private lateinit var grdsAdapter: DisconnectedGrdAdapter
+    private var lastModemState: String? = null
 
     private val mqttReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -55,6 +56,10 @@ class DashboardFragment : Fragment() {
                 MQTTService.ACTION_ERROR -> {
                     val err = intent.getStringExtra(MQTTService.EXTRA_ERROR) ?: return
                     Log.e("DashboardFragment", "ERROR: $err")
+                }
+                MQTTService.ACTION_BACKEND_STATUS -> {
+                    val estado = intent.getStringExtra(MQTTService.EXTRA_BACKEND_STATUS) ?: return
+                    handleBackendStatus(estado)
                 }
             }
         }
@@ -95,6 +100,7 @@ class DashboardFragment : Fragment() {
                 addAction(MQTTService.ACTION_ACTUALIZAR_GRADO)
                 addAction(MQTTService.ACTION_ACTUALIZAR_GRDS)
                 addAction(MQTTService.ACTION_ERROR)
+                addAction(MQTTService.ACTION_BACKEND_STATUS)
             }
         )
     }
@@ -105,21 +111,47 @@ class DashboardFragment : Fragment() {
     }
 
     private fun handleBrokerState(estado: String) {
-        val normalized = estado.uppercase()
-        if (normalized == BrokerEstado.DESCONECTADO.name) {
-            actualizarModemEstado(getString(R.string.status_disconnected_upper))
-            actualizarGrado(0.0)
-            grdsAdapter.submit(emptyList())
+        val brokerEstado = runCatching { BrokerEstado.valueOf(estado) }.getOrElse { BrokerEstado.ERROR }
+        when (brokerEstado) {
+            BrokerEstado.CONECTADO -> lastModemState?.let { actualizarModemEstado(it) }
+            BrokerEstado.DESCONECTADO -> {
+                mostrarModemSinDatos()
+                actualizarGrado(0.0)
+                grdsAdapter.submit(emptyList())
+            }
+            BrokerEstado.CONECTANDO,
+            BrokerEstado.REINTENTANDO,
+            BrokerEstado.ERROR -> mostrarModemSinDatos()
+        }
+    }
+
+    private fun handleBackendStatus(estado: String) {
+        if (estado.equals(MQTTService.STATUS_OFFLINE, ignoreCase = true)) {
+            mostrarBackendIncerto()
         }
     }
 
     private fun actualizarModemEstado(estado: String) {
+        lastModemState = estado
         txtModem.text = getString(R.string.modem_status, estado)
         if (estado.equals("CONECTADO", ignoreCase = true)) {
             indicatorModem.setBackgroundResource(R.drawable.led_verde)
         } else {
             indicatorModem.setBackgroundResource(R.drawable.led_rojo)
         }
+    }
+
+    private fun mostrarModemSinDatos() {
+        txtModem.text = getString(R.string.modem_status, getString(R.string.status_unknown_capitalized))
+        indicatorModem.setBackgroundResource(R.drawable.led_naranja)
+    }
+
+    private fun mostrarBackendIncerto() {
+        mostrarModemSinDatos()
+        txtGradoPct.text = getString(R.string.value_not_available)
+        progressGrado.progress = 0
+        indicatorSalud.setBackgroundResource(R.drawable.led_naranja)
+        grdsAdapter.submit(emptyList())
     }
 
     private fun actualizarGrado(porcentaje: Double) {
@@ -153,4 +185,3 @@ class DashboardFragment : Fragment() {
         }
     }
 }
-

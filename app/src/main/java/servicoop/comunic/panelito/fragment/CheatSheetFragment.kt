@@ -13,6 +13,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.IOException
+import java.net.ConnectException
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -25,7 +30,7 @@ class CheatSheetFragment : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private val cheatSheetAdapter by lazy {
-        CheatSheetAdapter(::openEndpointUrl, ::runPingForEndpoint)
+        CheatSheetAdapter(::openEndpointUrl, ::runPingForEndpoint, ::runTcpProbe)
     }
     private val items = mutableListOf<CheatSheetEntry>()
 
@@ -52,6 +57,7 @@ class CheatSheetFragment : Fragment() {
 
     private fun buildInitialItems() {
         val defaultPingResult = getString(R.string.cheat_sheet_ping_placeholder)
+        val defaultTcpResult = getString(R.string.cheat_sheet_tcp_placeholder)
         items.clear()
         items.add(
             CheatSheetEntry.Endpoint(
@@ -69,6 +75,15 @@ class CheatSheetFragment : Fragment() {
                 url = getString(R.string.cheat_sheet_pm_url),
                 ip = getString(R.string.cheat_sheet_pm_ip),
                 pingResult = defaultPingResult
+            )
+        )
+        items.add(
+            CheatSheetEntry.TcpProbe(
+                id = 3,
+                title = getString(R.string.cheat_sheet_modem_telef_title),
+                host = getString(R.string.cheat_sheet_modem_telef_host),
+                port = 40000,
+                result = defaultTcpResult
             )
         )
         items.add(CheatSheetEntry.Notes(getString(R.string.cheat_sheet_notes)))
@@ -114,6 +129,26 @@ class CheatSheetFragment : Fragment() {
         }
     }
 
+    private fun runTcpProbe(probe: CheatSheetEntry.TcpProbe) {
+        updateTcpProbe(probe.id) {
+            it.copy(
+                isRunning = true,
+                result = getString(R.string.cheat_sheet_tcp_running)
+            )
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                executeTcpProbe(probe.host, probe.port)
+            }
+            updateTcpProbe(probe.id) {
+                it.copy(
+                    isRunning = false,
+                    result = result
+                )
+            }
+        }
+    }
+
     private fun updateEndpoint(
         id: Int,
         transformer: (CheatSheetEntry.Endpoint) -> CheatSheetEntry.Endpoint
@@ -126,8 +161,39 @@ class CheatSheetFragment : Fragment() {
         }
     }
 
+    private fun updateTcpProbe(
+        id: Int,
+        transformer: (CheatSheetEntry.TcpProbe) -> CheatSheetEntry.TcpProbe
+    ) {
+        val index = items.indexOfFirst { it is CheatSheetEntry.TcpProbe && it.id == id }
+        if (index >= 0) {
+            val current = items[index] as CheatSheetEntry.TcpProbe
+            items[index] = transformer(current)
+            submitItems()
+        }
+    }
+
     private fun submitItems() {
         cheatSheetAdapter.submitList(items.toList())
+    }
+
+    private fun executeTcpProbe(host: String, port: Int): String {
+        return try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(host, port), 3000)
+            }
+            getString(R.string.cheat_sheet_tcp_open, port)
+        } catch (ex: ConnectException) {
+            getString(R.string.cheat_sheet_tcp_closed, port)
+        } catch (ex: SocketTimeoutException) {
+            getString(R.string.cheat_sheet_tcp_closed, port)
+        } catch (ex: UnknownHostException) {
+            getString(R.string.cheat_sheet_tcp_unknown)
+        } catch (ex: IOException) {
+            getString(R.string.cheat_sheet_tcp_unknown)
+        } catch (ex: Exception) {
+            getString(R.string.cheat_sheet_tcp_unknown)
+        }
     }
 
     private fun executePing(target: String): String {

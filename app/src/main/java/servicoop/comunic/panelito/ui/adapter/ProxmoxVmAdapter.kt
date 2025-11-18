@@ -14,15 +14,6 @@ import kotlin.math.roundToInt
 
 class ProxmoxVmAdapter : ListAdapter<ProxmoxVm, ProxmoxVmAdapter.ProxmoxVmViewHolder>(DiffCallback) {
 
-    private var maxReadRate = 0.0
-    private var maxWriteRate = 0.0
-
-    override fun submitList(list: List<ProxmoxVm>?) {
-        maxReadRate = list?.maxOfOrNull { it.diskReadRateBps } ?: 0.0
-        maxWriteRate = list?.maxOfOrNull { it.diskWriteRateBps } ?: 0.0
-        super.submitList(list?.map { it.copy() })
-    }
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ProxmoxVmViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_proxmox_vm, parent, false)
@@ -79,22 +70,17 @@ class ProxmoxVmAdapter : ListAdapter<ProxmoxVm, ProxmoxVmAdapter.ProxmoxVmViewHo
                 context.getString(R.string.proxmox_disk_total_unknown)
             }
 
-            diskReadValue.text = formatRate(context, vm.diskReadRateBps)
-            diskWriteValue.text = formatRate(context, vm.diskWriteRateBps)
+            diskReadValue.text = formatBytes(context, vm.diskReadBytes)
+            diskWriteValue.text = formatBytes(context, vm.diskWriteBytes)
 
             cpusText.text = context.getString(R.string.proxmox_cpus_label, vm.cpus)
             uptimeText.text = context.getString(R.string.proxmox_uptime_label, vm.uptime)
         }
 
-        private fun normalizeRate(value: Double, max: Double): Double {
-            if (value <= 0.0 || max <= 0.0) return 0.0
-            return (value / max * 100.0).coerceIn(0.0, 100.0)
-        }
-
-        private fun formatRate(context: android.content.Context, rateBps: Double): String {
-            if (rateBps <= 0.0) return context.getString(R.string.proxmox_disk_rate_zero)
+        private fun formatBytes(context: android.content.Context, bytes: Double): String {
+            if (bytes <= 0.0) return context.getString(R.string.proxmox_disk_rate_zero)
             val units = arrayOf("B", "KB", "MB", "GB", "TB")
-            var value = rateBps
+            var value = bytes
             var unitIndex = 0
             while (value >= 1024 && unitIndex < units.lastIndex) {
                 value /= 1024

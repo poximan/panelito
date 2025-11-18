@@ -21,6 +21,7 @@ import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.EmailEvent
+import servicoop.comunic.panelito.core.util.TimestampFormatter
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.MainActivity
 import servicoop.comunic.panelito.ui.adapter.EmailEventsAdapter
@@ -209,22 +210,24 @@ class EmailEventsFragment : Fragment() {
         try {
             val root = JSONObject(json)
             val defaultUnknown = getString(R.string.status_unknown)
-            val smtp = root.optString("smtp", defaultUnknown)
-            val pingLocal = root.optString("ping_local", defaultUnknown)
-            val pingRemoto = root.optString("ping_remoto", defaultUnknown)
-            val ts = root.optString("ts", "")
+            val smtp = root.optString("smtp", defaultUnknown).trim().ifEmpty { defaultUnknown }
+            val pingLocal = root.optString("ping_local", defaultUnknown).trim().ifEmpty { defaultUnknown }
+            val pingRemoto = root.optString("ping_remoto", defaultUnknown).trim().ifEmpty { defaultUnknown }
+            val tsRaw = root.optString("ts", "")
+            val tsFormatted = TimestampFormatter.format(tsRaw, "")
 
             txtSmtp.text = getString(R.string.email_smtp_format, formatearEstado(smtp))
             txtPingLocal.text = getString(R.string.email_ping_local_format, formatearEstado(pingLocal))
             txtPingRemote.text = getString(R.string.email_ping_remote_format, formatearEstado(pingRemoto))
 
             val estados = listOf(smtp, pingLocal, pingRemoto)
+            val normalized = estados.map { it.trim().lowercase(Locale.getDefault()) }
             val resumen = when {
-                estados.any { it.equals("desconectado", ignoreCase = true) } -> {
+                normalized.any { it == "desconectado" } -> {
                     indicatorStatus.setBackgroundResource(R.drawable.led_rojo)
                     getString(R.string.email_summary_no_service)
                 }
-                estados.any { it.equals("desconocido", ignoreCase = true) } -> {
+                normalized.any { it == "desconocido" } -> {
                     indicatorStatus.setBackgroundResource(R.drawable.led_naranja)
                     getString(R.string.email_summary_unknown)
                 }
@@ -233,7 +236,7 @@ class EmailEventsFragment : Fragment() {
                     getString(R.string.email_summary_operational)
                 }
             }
-            val sello = if (ts.isNotBlank()) " - $ts" else ""
+            val sello = if (tsFormatted.isNotBlank()) " - $tsFormatted" else ""
             txtSummary.text = resumen + sello
         } catch (e: Exception) {
             txtSummary.text = getString(R.string.email_summary_unknown)
@@ -242,7 +245,7 @@ class EmailEventsFragment : Fragment() {
     }
 
     private fun formatearEstado(valor: String): String {
-        val base = valor.ifBlank { getString(R.string.status_unknown) }
+        val base = valor.trim().ifBlank { getString(R.string.status_unknown) }
         val lower = base.lowercase(Locale.getDefault())
         return lower.replaceFirstChar { ch ->
             if (ch.isLowerCase()) ch.titlecase(Locale.getDefault()) else ch.toString()
@@ -283,4 +286,3 @@ class EmailEventsFragment : Fragment() {
         fun newInstance(): EmailEventsFragment = EmailEventsFragment()
     }
 }
-

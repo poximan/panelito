@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.EmailEvent
+import servicoop.comunic.panelito.core.util.TimestampFormatter
 
 class EmailEventsAdapter : RecyclerView.Adapter<EmailEventsAdapter.ViewHolder>() {
 
@@ -47,9 +48,8 @@ class EmailEventsAdapter : RecyclerView.Adapter<EmailEventsAdapter.ViewHolder>()
                 status.text = ctx.getString(R.string.email_event_status_fail)
             }
 
-            val ts = event.timestamp.ifBlank { ctx.getString(R.string.status_unknown) }
+            val ts = TimestampFormatter.format(event.timestamp, ctx.getString(R.string.status_unknown))
             timestamp.text = ctx.getString(R.string.email_event_timestamp, ts)
         }
     }
 }
-

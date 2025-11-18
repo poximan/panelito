@@ -26,6 +26,7 @@ import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.data.datastore.SettingsDataStore
 import servicoop.comunic.panelito.fragment.CheatSheetFragment
+import servicoop.comunic.panelito.fragment.CharitoFragment
 import servicoop.comunic.panelito.fragment.DashboardFragment
 import servicoop.comunic.panelito.fragment.EmailEventsFragment
 import servicoop.comunic.panelito.fragment.ProxmoxFragment
@@ -86,7 +87,7 @@ class MainActivity : AppCompatActivity() {
         viewPager = findViewById(R.id.view_pager)
 
         viewPager.adapter = MainPagerAdapter(this)
-        viewPager.offscreenPageLimit = 3
+        viewPager.offscreenPageLimit = 4
 
         switchConnect.setOnCheckedChangeListener { _, isChecked ->
             if (suppressSwitchChange) return@setOnCheckedChangeListener
@@ -193,30 +194,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_PHONE_STATE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsToRequest.add(Manifest.permission.READ_PHONE_STATE)
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_CONTACTS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsToRequest.add(Manifest.permission.READ_CONTACTS)
-        }
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_CALL_LOG
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionsToRequest.add(Manifest.permission.READ_CALL_LOG)
-        }
-
         if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(
                 this,
@@ -268,14 +245,16 @@ class MainActivity : AppCompatActivity() {
     fun isBrokerDesiredEnabled(): Boolean = desiredServiceEnabled
 
     private class MainPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
-        override fun getItemCount(): Int = 4
+        override fun getItemCount(): Int = 5
 
         override fun createFragment(position: Int) = when (position) {
             0 -> DashboardFragment.newInstance()
             1 -> ProxmoxFragment.newInstance()
-            2 -> EmailEventsFragment.newInstance()
+            2 -> CharitoFragment.newInstance()
+            3 -> EmailEventsFragment.newInstance()
             else -> CheatSheetFragment.newInstance()
         }
     }
 }
+
 

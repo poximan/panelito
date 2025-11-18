@@ -20,16 +20,27 @@ sealed class CheatSheetEntry {
         val isPingRunning: Boolean = false
     ) : CheatSheetEntry()
 
+    data class TcpProbe(
+        val id: Int,
+        val title: String,
+        val host: String,
+        val port: Int,
+        val result: String,
+        val isRunning: Boolean = false
+    ) : CheatSheetEntry()
+
     data class Notes(val text: String) : CheatSheetEntry()
 }
 
 class CheatSheetAdapter(
     private val onVisitClicked: (CheatSheetEntry.Endpoint) -> Unit,
-    private val onPingClicked: (CheatSheetEntry.Endpoint) -> Unit
+    private val onPingClicked: (CheatSheetEntry.Endpoint) -> Unit,
+    private val onTcpProbeClicked: (CheatSheetEntry.TcpProbe) -> Unit
 ) : ListAdapter<CheatSheetEntry, RecyclerView.ViewHolder>(DiffCallback) {
 
     override fun getItemViewType(position: Int): Int = when (getItem(position)) {
         is CheatSheetEntry.Endpoint -> VIEW_TYPE_ENDPOINT
+        is CheatSheetEntry.TcpProbe -> VIEW_TYPE_TCP_PROBE
         is CheatSheetEntry.Notes -> VIEW_TYPE_NOTES
     }
 
@@ -39,6 +50,11 @@ class CheatSheetAdapter(
             VIEW_TYPE_ENDPOINT -> {
                 val view = inflater.inflate(R.layout.item_cheat_sheet_endpoint, parent, false)
                 EndpointViewHolder(view, onVisitClicked, onPingClicked)
+            }
+
+            VIEW_TYPE_TCP_PROBE -> {
+                val view = inflater.inflate(R.layout.item_cheat_sheet_tcp_probe, parent, false)
+                TcpProbeViewHolder(view, onTcpProbeClicked)
             }
 
             VIEW_TYPE_NOTES -> {
@@ -53,6 +69,7 @@ class CheatSheetAdapter(
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
             is EndpointViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.Endpoint)
+            is TcpProbeViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.TcpProbe)
             is NotesViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.Notes)
         }
     }
@@ -87,6 +104,34 @@ class CheatSheetAdapter(
         }
     }
 
+    private class TcpProbeViewHolder(
+        itemView: View,
+        private val onProbe: (CheatSheetEntry.TcpProbe) -> Unit
+    ) : RecyclerView.ViewHolder(itemView) {
+        private val titleView: TextView = itemView.findViewById(R.id.txt_tcp_title)
+        private val targetView: TextView = itemView.findViewById(R.id.txt_tcp_target)
+        private val probeButton: Button = itemView.findViewById(R.id.btn_tcp_probe)
+        private val resultView: TextView = itemView.findViewById(R.id.txt_tcp_result)
+
+        fun bind(item: CheatSheetEntry.TcpProbe) {
+            val context = itemView.context
+            titleView.text = item.title
+            targetView.text = context.getString(
+                R.string.cheat_sheet_tcp_target,
+                item.host,
+                item.port
+            )
+            resultView.text = item.result
+            probeButton.isEnabled = !item.isRunning
+            probeButton.alpha = if (item.isRunning) 0.5f else 1f
+            probeButton.setOnClickListener {
+                if (!item.isRunning) {
+                    onProbe(item)
+                }
+            }
+        }
+    }
+
     private class NotesViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val notesView: TextView = itemView.findViewById(R.id.txt_cheat_notes)
 
@@ -98,6 +143,7 @@ class CheatSheetAdapter(
     private companion object {
         private const val VIEW_TYPE_ENDPOINT = 1
         private const val VIEW_TYPE_NOTES = 2
+        private const val VIEW_TYPE_TCP_PROBE = 3
 
         private val DiffCallback = object : DiffUtil.ItemCallback<CheatSheetEntry>() {
             override fun areItemsTheSame(
@@ -106,6 +152,8 @@ class CheatSheetAdapter(
             ): Boolean {
                 return when {
                     oldItem is CheatSheetEntry.Endpoint && newItem is CheatSheetEntry.Endpoint ->
+                        oldItem.id == newItem.id
+                    oldItem is CheatSheetEntry.TcpProbe && newItem is CheatSheetEntry.TcpProbe ->
                         oldItem.id == newItem.id
                     oldItem is CheatSheetEntry.Notes && newItem is CheatSheetEntry.Notes -> true
                     else -> false
@@ -119,4 +167,3 @@ class CheatSheetAdapter(
         }
     }
 }
-

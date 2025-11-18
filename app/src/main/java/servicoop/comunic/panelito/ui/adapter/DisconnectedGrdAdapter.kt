@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.GrdDesconectado
 import servicoop.comunic.panelito.core.util.TimeUtils
+import servicoop.comunic.panelito.core.util.TimestampFormatter
 
 class DisconnectedGrdAdapter :
     ListAdapter<GrdDesconectado, DisconnectedGrdAdapter.VH>(DIFF) {
@@ -58,7 +59,10 @@ class DisconnectedGrdAdapter :
 
         fun bind(item: GrdDesconectado) {
             txtEquipo.text = item.nombre
-            txtUltima.text = item.ultimaCaida
+            txtUltima.text = TimestampFormatter.format(
+                item.ultimaCaida,
+                itemView.context.getString(R.string.value_not_available)
+            )
             val desc = TimeUtils.sinceDescription(item.ultimaCaida)
             txtTdesc.text = desc ?: itemView.context.getString(R.string.value_not_available)
         }
