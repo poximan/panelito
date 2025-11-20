@@ -1,4 +1,4 @@
-ï»¿package servicoop.comunic.panelito.services.mqtt
+package servicoop.comunic.panelito.services.mqtt
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -129,10 +129,12 @@ class MQTTService : Service(), MqttCallbackExtended {
     @Volatile private var pendingGrds: String? = null
     private val charoHosts: MutableMap<String, CharoHostState> = mutableMapOf()
     @Volatile private var charoWhitelist: Set<String> = emptySet()
+    private val charoAliasToId: MutableMap<String, String> = mutableMapOf()
 
     private data class CharoHostState(
-        val topicId: String,
+        var topicId: String,
         var instanceId: String = topicId,
+        var alias: String = topicId,
         var status: String = STATUS_UNKNOWN,
         var metrics: JSONObject? = null,
         var lastSeenMs: Long = System.currentTimeMillis()
@@ -506,15 +508,30 @@ class MQTTService : Service(), MqttCallbackExtended {
             val json = JSONObject(payload)
             val array = json.optJSONArray("items") ?: JSONArray()
             val ids = mutableSetOf<String>()
+            val newAliasMap = mutableMapOf<String, String>()
+
             for (index in 0 until array.length()) {
                 val entry = array.optJSONObject(index) ?: continue
-                val id = entry.optString("instanceId").trim()
-                if (id.isNotEmpty()) {
-                    ids.add(id)
+
+                val alias = entry.optString("alias").takeIf { it.isNotBlank() } ?: continue
+                val id = entry.optString("instanceId").trim().ifEmpty { alias }
+
+                ids += id
+                newAliasMap[alias] = id
+
+                ensureCharoPlaceholder(id, alias)
+
+                val previousId = charoAliasToId[alias]
+                if (previousId != null && previousId != id) {
+                    renameCharoHost(previousId, id, alias)
                 }
             }
+
+            charoAliasToId.clear()
+            charoAliasToId.putAll(newAliasMap)
             charoWhitelist = ids
             pruneCharoHostsByWhitelist()
+            broadcastCharoState()
         } catch (e: Exception) {
             Log.w("MQTTService", "Error parsing charo whitelist: ${e.message}")
         }
@@ -543,6 +560,25 @@ class MQTTService : Service(), MqttCallbackExtended {
         }
     }
 
+    private fun ensureCharoPlaceholder(instanceId: String, alias: String) {
+        val entry = charoHosts.getOrPut(instanceId) { CharoHostState(topicId = instanceId) }
+        entry.topicId = instanceId
+        entry.instanceId = instanceId
+        entry.alias = alias
+        if (entry.status == STATUS_UNKNOWN) {
+            entry.status = STATUS_OFFLINE
+        }
+    }
+
+    private fun renameCharoHost(oldId: String, newId: String, alias: String) {
+        if (oldId == newId) return
+        val entry = charoHosts.remove(oldId) ?: return
+        entry.topicId = newId
+        entry.instanceId = newId
+        entry.alias = alias
+        charoHosts[newId] = entry
+    }
+
     private fun updateCharoMetrics(topic: String, payload: String) {
         try {
             val metricsJson = JSONObject(payload)
@@ -559,6 +595,9 @@ class MQTTService : Service(), MqttCallbackExtended {
                 return
             }
             markCharoHeartbeat(entry)
+            if (entry.status != STATUS_ONLINE) {
+                entry.status = STATUS_ONLINE
+            }
             entry.metrics = metricsJson
             broadcastCharoState()
         } catch (ex: Exception) {
@@ -631,6 +670,7 @@ class MQTTService : Service(), MqttCallbackExtended {
             }
             payload.put("status", entry.status)
             payload.put("topicId", entry.topicId)
+            payload.put("alias", entry.alias)
             itemsArray.put(payload)
         }
         val wrapper = JSONObject().put("items", itemsArray)

@@ -25,6 +25,8 @@ import servicoop.comunic.panelito.services.mqtt.MQTTService
 import java.util.Locale
 import kotlin.math.roundToInt
 
+private val IPV4_REGEX = Regex("^(?:\\d{1,3}\\.){3}\\d{1,3}$")
+
 class CharitoFragment : Fragment() {
     private lateinit var recycler: RecyclerView
     private lateinit var empty: TextView
@@ -84,6 +86,7 @@ class CharitoFragment : Fragment() {
             val list = mutableListOf<CharoInstance>()
             for (i in 0 until items.length()) {
                 val current = items.optJSONObject(i) ?: continue
+                val alias = current.optString("alias")
                 val id = current.optString("instanceId").ifBlank { current.optString("topicId") }
                 if (id.isBlank()) continue
                 val receivedAt = current.optString("receivedAt", current.optString("generatedAt", ""))
@@ -93,6 +96,7 @@ class CharitoFragment : Fragment() {
                 val avgMemRatio = current.optDouble("averageMemoryUsageRatio", Double.NaN)
                 val status = current.optString("status", "")
                 val processes = extractProcesses(current)
+                val interfaces = extractInterfaces(current)
                 list.add(
                     CharoInstance(
                         instanceId = id,
@@ -103,6 +107,8 @@ class CharitoFragment : Fragment() {
                         avgMemPercent = if (!avgMemRatio.isNaN() && avgMemRatio >= 0.0) avgMemRatio * 100.0 else null,
                         status = status,
                         processes = processes,
+                        alias = alias,
+                        interfaces = interfaces,
                     )
                 )
             }
@@ -148,6 +154,49 @@ class CharitoFragment : Fragment() {
         }
         return result
     }
+
+    private fun extractInterfaces(entry: JSONObject): List<CharoInterface> {
+        val sample = entry.optJSONObject("latestSample")
+        val array = sample?.optJSONArray("networkInterfaces")
+            ?: entry.optJSONArray("networkInterfaces")
+            ?: JSONArray()
+        val result = mutableListOf<CharoInterface>()
+        for (index in 0 until array.length()) {
+            val iface = array.optJSONObject(index) ?: continue
+            val ipv4 = findIpv4(iface.optJSONArray("addresses") ?: JSONArray()) ?: continue
+            val name = iface.optString("displayName", iface.optString("name", "")).ifBlank {
+                iface.optString("name", "")
+            }
+            if (name.isBlank()) continue
+            val upState: Boolean? = if (iface.has("up") && !iface.isNull("up")) {
+                iface.optBoolean("up")
+            } else {
+                null
+            }
+            result.add(
+                CharoInterface(
+                    name = name,
+                    ipv4 = ipv4.first,
+                    netmask = ipv4.second,
+                    up = upState,
+                    virtual = iface.optBoolean("virtual"),
+                )
+            )
+        }
+        return result
+    }
+
+    private fun findIpv4(addresses: JSONArray): Pair<String, String?>? {
+        for (i in 0 until addresses.length()) {
+            val obj = addresses.optJSONObject(i) ?: continue
+            val address = obj.optString("address").trim()
+            if (address.isBlank() || !IPV4_REGEX.matches(address)) continue
+            val netmaskRaw = obj.optString("netmask").trim()
+            val netmask = if (netmaskRaw.isNotEmpty() && IPV4_REGEX.matches(netmaskRaw)) netmaskRaw else null
+            return address to netmask
+        }
+        return null
+    }
 }
 
 data class CharoInstance(
@@ -159,6 +208,8 @@ data class CharoInstance(
     val avgMemPercent: Double?,
     val status: String,
     val processes: List<CharoProcess>,
+    val alias: String?,
+    val interfaces: List<CharoInterface>,
 )
 
 data class CharoProcess(
@@ -171,6 +222,14 @@ enum class CharoProcessState {
     STOPPED,
     UNKNOWN
 }
+
+data class CharoInterface(
+    val name: String,
+    val ipv4: String,
+    val netmask: String?,
+    val up: Boolean?,
+    val virtual: Boolean,
+)
 
 class CharitoInstanceAdapter : RecyclerView.Adapter<CharitoVH>() {
     private var items: List<CharoInstance> = emptyList()
@@ -190,6 +249,7 @@ class CharitoInstanceAdapter : RecyclerView.Adapter<CharitoVH>() {
 
 class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
     private val title: TextView = view.findViewById(R.id.txt_charito_tile_title)
+    private val aliasLabel: TextView = view.findViewById(R.id.txt_charito_tile_alias)
     private val status: TextView = view.findViewById(R.id.txt_charito_tile_status)
     private val indicator: View = view.findViewById(R.id.indicator_charito_status)
     private val updated: TextView = view.findViewById(R.id.txt_charito_tile_updated)
@@ -198,13 +258,18 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
     private val cpuProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu)
     private val memValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_value)
     private val memProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory)
+    private val networkTitle: TextView = view.findViewById(R.id.txt_charito_network_title)
+    private val networkContainer: LinearLayout = view.findViewById(R.id.container_charito_networks)
     private val processTitle: TextView = view.findViewById(R.id.txt_charito_processes_title)
     private val processContainer: LinearLayout = view.findViewById(R.id.container_charito_processes)
 
     fun bind(item: CharoInstance) {
         val ctx = itemView.context
-        val displayId = item.instanceId.ifBlank { ctx.getString(R.string.charo_instance_unknown_id) }
+        val displayId = item.instanceId.ifBlank { item.alias ?: ctx.getString(R.string.charo_instance_unknown_id) }
         title.text = displayId
+        val aliasText = item.alias?.takeIf { it.isNotBlank() && it != displayId }
+        aliasLabel.isVisible = !aliasText.isNullOrBlank()
+        aliasLabel.text = aliasText ?: ""
 
         val statusText = when (item.status.lowercase(Locale.getDefault())) {
             "online" -> {
@@ -233,6 +298,7 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
 
         bindMetric(item.avgCpuPercent, cpuValue, cpuProgress, ctx, true)
         bindMetric(item.avgMemPercent, memValue, memProgress, ctx, false)
+        renderNetworks(item.interfaces)
         renderProcesses(item.processes)
     }
 
@@ -255,6 +321,59 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
             progressBar.isIndeterminate = false
             progressBar.progress = 0
             progressBar.alpha = 0.3f
+        }
+    }
+
+    private fun renderNetworks(interfaces: List<CharoInterface>) {
+        val ctx = itemView.context
+        networkContainer.removeAllViews()
+        networkTitle.isVisible = true
+        if (interfaces.isEmpty()) {
+            val placeholder = TextView(ctx).apply {
+                text = ctx.getString(R.string.charo_network_empty)
+                setTextColor(Color.WHITE)
+                background = ContextCompat.getDrawable(ctx, R.drawable.bg_charo_process_unknown)
+                setPadding(dp(12), dp(6), dp(12), dp(6))
+            }
+            networkContainer.addView(placeholder)
+            return
+        }
+        interfaces.forEachIndexed { index, iface ->
+            val statusTextRes = when (iface.up) {
+                true -> R.string.charo_network_status_up
+                false -> R.string.charo_network_status_down
+                null -> R.string.charo_network_status_unknown
+            }
+            val statusText = ctx.getString(statusTextRes)
+            val nameLabel = if (iface.virtual) {
+                ctx.getString(R.string.charo_network_virtual_name, iface.name)
+            } else {
+                iface.name
+            }
+            val ipLabel = iface.netmask?.let { ctx.getString(R.string.charo_network_ip_mask, iface.ipv4, it) } ?: iface.ipv4
+            val chipText = ctx.getString(R.string.charo_network_chip_text, nameLabel, statusText, ipLabel)
+            val bgRes = when (iface.up) {
+                true -> R.drawable.bg_charo_process_active
+                false -> R.drawable.bg_charo_process_stopped
+                null -> R.drawable.bg_charo_process_unknown
+            }
+            val textColor = if (iface.up == false) Color.BLACK else Color.WHITE
+            val chip = TextView(ctx).apply {
+                text = chipText
+                setTextColor(textColor)
+                background = ContextCompat.getDrawable(ctx, bgRes)
+                textSize = 13f
+                setPadding(dp(12), dp(6), dp(12), dp(6))
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            if (index > 0) {
+                params.topMargin = dp(6)
+            }
+            chip.layoutParams = params
+            networkContainer.addView(chip)
         }
     }
 
