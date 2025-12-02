@@ -137,7 +137,8 @@ class MQTTService : Service(), MqttCallbackExtended {
         var alias: String = topicId,
         var status: String = STATUS_UNKNOWN,
         var metrics: JSONObject? = null,
-        var lastSeenMs: Long = System.currentTimeMillis()
+        var lastSeenMs: Long = System.currentTimeMillis(),
+        var timeoutMs: Long = CHARO_TIMEOUT_MS
     )
 
     private lateinit var options: MqttConnectOptions
@@ -599,6 +600,10 @@ class MQTTService : Service(), MqttCallbackExtended {
                 entry.status = STATUS_ONLINE
             }
             entry.metrics = metricsJson
+            val timeoutSeconds = metricsJson.optLong("timeoutSeconds", 0L)
+            if (timeoutSeconds > 0) {
+                entry.timeoutMs = timeoutSeconds * 1000L
+            }
             broadcastCharoState()
         } catch (ex: Exception) {
             val detail = ex.message ?: topic
@@ -669,6 +674,9 @@ class MQTTService : Service(), MqttCallbackExtended {
                 payload.put("instanceId", entry.instanceId)
             }
             payload.put("status", entry.status)
+            if (!payload.has("timeoutSeconds")) {
+                payload.put("timeoutSeconds", entry.timeoutMs / 1000L)
+            }
             payload.put("topicId", entry.topicId)
             payload.put("alias", entry.alias)
             itemsArray.put(payload)
@@ -684,7 +692,8 @@ class MQTTService : Service(), MqttCallbackExtended {
         var changed = false
         for (entry in charoHosts.values) {
             val elapsed = now - entry.lastSeenMs
-            if (elapsed > CHARO_TIMEOUT_MS && entry.status != STATUS_OFFLINE) {
+            val threshold = (entry.timeoutMs.takeIf { it > 0 } ?: CHARO_TIMEOUT_MS) * 2
+            if (elapsed > threshold && entry.status != STATUS_OFFLINE) {
                 entry.status = STATUS_OFFLINE
                 changed = true
             }

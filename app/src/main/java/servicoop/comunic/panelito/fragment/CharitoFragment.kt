@@ -90,10 +90,13 @@ class CharitoFragment : Fragment() {
                 val id = current.optString("instanceId").ifBlank { current.optString("topicId") }
                 if (id.isBlank()) continue
                 val receivedAt = current.optString("receivedAt", current.optString("generatedAt", ""))
-                val samples = current.optInt("samples", current.optInt("sampleCount", 0))
-                val window = current.optLong("windowSeconds", current.optLong("windowDurationSeconds", 0L))
+                val samples = current.optInt("samples", 0)
+                val window = current.optLong("windowSeconds", 0L)
                 val avgCpu = current.optDouble("averageCpuLoad", Double.NaN)
                 val avgMemRatio = current.optDouble("averageMemoryUsageRatio", Double.NaN)
+                val instCpu = current.optDouble("cpuLoadInstant", Double.NaN)
+                val instMem = current.optDouble("memoryUsageInstant", Double.NaN)
+                val tempInstant = current.optDouble("cpuTemperatureInstant", Double.NaN)
                 val status = current.optString("status", "")
                 val processes = extractProcesses(current)
                 val interfaces = extractInterfaces(current)
@@ -103,8 +106,11 @@ class CharitoFragment : Fragment() {
                         receivedAt = receivedAt,
                         samples = samples,
                         windowSeconds = window,
-                        avgCpuPercent = if (!avgCpu.isNaN() && avgCpu >= 0.0) avgCpu * 100.0 else null,
-                        avgMemPercent = if (!avgMemRatio.isNaN() && avgMemRatio >= 0.0) avgMemRatio * 100.0 else null,
+                        avgCpuPercent = percentOrNull(avgCpu),
+                        avgMemPercent = percentOrNull(avgMemRatio),
+                        cpuInstantPercent = percentOrNull(instCpu),
+                        memInstantPercent = percentOrNull(instMem),
+                        cpuTempCelsius = tempInstant.takeIf { !it.isNaN() && it >= 0.0 },
                         status = status,
                         processes = processes,
                         alias = alias,
@@ -206,6 +212,9 @@ data class CharoInstance(
     val windowSeconds: Long,
     val avgCpuPercent: Double?,
     val avgMemPercent: Double?,
+    val cpuInstantPercent: Double?,
+    val memInstantPercent: Double?,
+    val cpuTempCelsius: Double?,
     val status: String,
     val processes: List<CharoProcess>,
     val alias: String?,
@@ -254,10 +263,15 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
     private val indicator: View = view.findViewById(R.id.indicator_charito_status)
     private val updated: TextView = view.findViewById(R.id.txt_charito_tile_updated)
     private val window: TextView = view.findViewById(R.id.txt_charito_tile_window)
-    private val cpuValue: TextView = view.findViewById(R.id.txt_charito_tile_cpu_value)
-    private val cpuProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu)
-    private val memValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_value)
-    private val memProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory)
+    private val cpuAvgValue: TextView = view.findViewById(R.id.txt_charito_tile_cpu_avg_value)
+    private val cpuAvgProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu_avg)
+    private val cpuInstValue: TextView = view.findViewById(R.id.txt_charito_tile_cpu_inst_value)
+    private val cpuInstProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu_inst)
+    private val tempValue: TextView = view.findViewById(R.id.txt_charito_tile_temp_value)
+    private val memAvgValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_avg_value)
+    private val memAvgProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory_avg)
+    private val memInstValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_inst_value)
+    private val memInstProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory_inst)
     private val networkTitle: TextView = view.findViewById(R.id.txt_charito_network_title)
     private val networkContainer: LinearLayout = view.findViewById(R.id.container_charito_networks)
     private val processTitle: TextView = view.findViewById(R.id.txt_charito_processes_title)
@@ -296,8 +310,12 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
         )
         window.text = ctx.getString(R.string.charo_tile_window_format, samplesText, item.windowSeconds)
 
-        bindMetric(item.avgCpuPercent, cpuValue, cpuProgress, ctx, true)
-        bindMetric(item.avgMemPercent, memValue, memProgress, ctx, false)
+        bindMetric(item.avgCpuPercent, cpuAvgValue, cpuAvgProgress, R.string.charo_cpu_na)
+        bindMetric(item.cpuInstantPercent, cpuInstValue, cpuInstProgress, R.string.charo_cpu_na)
+        tempValue.text = item.cpuTempCelsius?.let { ctx.getString(R.string.charo_temp_format, it) }
+            ?: ctx.getString(R.string.charo_temp_na)
+        bindMetric(item.avgMemPercent, memAvgValue, memAvgProgress, R.string.charo_mem_na)
+        bindMetric(item.memInstantPercent, memInstValue, memInstProgress, R.string.charo_mem_na)
         renderNetworks(item.interfaces)
         renderProcesses(item.processes)
     }
@@ -306,18 +324,15 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
         value: Double?,
         label: TextView,
         progressBar: android.widget.ProgressBar,
-        ctx: Context,
-        isCpu: Boolean
+        fallbackRes: Int
     ) {
         if (value != null && value >= 0) {
-            val text = if (isCpu) ctx.getString(R.string.charo_cpu_value, value)
-            else ctx.getString(R.string.charo_mem_value, value)
-            label.text = text
+            label.text = itemView.context.getString(R.string.percent_format, value)
             progressBar.isIndeterminate = false
             progressBar.progress = value.coerceIn(0.0, 100.0).toInt()
             progressBar.alpha = 1f
         } else {
-            label.text = if (isCpu) ctx.getString(R.string.charo_cpu_na) else ctx.getString(R.string.charo_mem_na)
+            label.text = itemView.context.getString(fallbackRes)
             progressBar.isIndeterminate = false
             progressBar.progress = 0
             progressBar.alpha = 0.3f
@@ -436,3 +451,6 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
     private fun dp(value: Int): Int =
         (value * itemView.resources.displayMetrics.density).roundToInt()
 }
+
+private fun percentOrNull(value: Double): Double? =
+    if (!value.isNaN() && value >= 0.0) value * 100.0 else null

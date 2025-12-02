@@ -76,23 +76,52 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/charo_tile_cpu_label"
+            android:text="@string/charo_tile_cpu_avg_label"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/txt_charito_tile_cpu_value"
+            android:id="@+id/txt_charito_tile_cpu_avg_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/charo_cpu_na" />
 
         <ProgressBar
-            android:id="@+id/progress_charito_cpu"
+            android:id="@+id/progress_charito_cpu_avg"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="12dp"
             android:layout_marginTop="4dp"
             android:max="100"
             android:progress="0" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/charo_tile_cpu_inst_label"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/txt_charito_tile_cpu_inst_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/charo_cpu_na" />
+
+        <ProgressBar
+            android:id="@+id/progress_charito_cpu_inst"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:layout_marginTop="4dp"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:id="@+id/txt_charito_tile_temp_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/charo_temp_na" />
     </LinearLayout>
 
     <LinearLayout
@@ -104,17 +133,39 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/charo_tile_memory_label"
+            android:text="@string/charo_tile_memory_avg_label"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/txt_charito_tile_memory_value"
+            android:id="@+id/txt_charito_tile_memory_avg_value"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/charo_mem_na" />
 
         <ProgressBar
-            android:id="@+id/progress_charito_memory"
+            android:id="@+id/progress_charito_memory_avg"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:layout_marginTop="4dp"
+            android:max="100"
+            android:progress="0" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/charo_tile_memory_inst_label"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/txt_charito_tile_memory_inst_value"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/charo_mem_na" />
+
+        <ProgressBar
+            android:id="@+id/progress_charito_memory_inst"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="12dp"
