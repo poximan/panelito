@@ -12,6 +12,12 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.ui.adapter.CheatSheetAdapter
+import servicoop.comunic.panelito.ui.adapter.CheatSheetEntry
 import java.io.IOException
 import java.net.ConnectException
 import java.net.InetSocketAddress
@@ -19,12 +25,6 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import servicoop.comunic.panelito.R
-import servicoop.comunic.panelito.ui.adapter.CheatSheetAdapter
-import servicoop.comunic.panelito.ui.adapter.CheatSheetEntry
 
 class CheatSheetFragment : Fragment() {
 

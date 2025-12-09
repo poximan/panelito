@@ -25,8 +25,8 @@ import kotlinx.coroutines.launch
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.data.datastore.SettingsDataStore
-import servicoop.comunic.panelito.fragment.CheatSheetFragment
 import servicoop.comunic.panelito.fragment.CharitoFragment
+import servicoop.comunic.panelito.fragment.CheatSheetFragment
 import servicoop.comunic.panelito.fragment.DashboardFragment
 import servicoop.comunic.panelito.fragment.EmailEventsFragment
 import servicoop.comunic.panelito.fragment.ProxmoxFragment

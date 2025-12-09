@@ -17,6 +17,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
@@ -25,10 +27,7 @@ import servicoop.comunic.panelito.core.util.TimestampFormatter
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.MainActivity
 import servicoop.comunic.panelito.ui.adapter.EmailEventsAdapter
-import java.util.ArrayList
 import java.util.Locale
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 class EmailEventsFragment : Fragment() {
 

@@ -4,19 +4,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Bundle
 import android.graphics.Color
+import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
@@ -62,6 +63,7 @@ class CharitoFragment : Fragment() {
             receiver,
             IntentFilter(MQTTService.ACTION_CHARITO_ESTADO)
         )
+        adapter.resetExpandedState()
         lastPayload?.let { parseAndRender(it) } ?: run {
             empty.isVisible = true
             empty.text = getString(R.string.charo_list_empty)
@@ -242,21 +244,49 @@ data class CharoInterface(
 
 class CharitoInstanceAdapter : RecyclerView.Adapter<CharitoVH>() {
     private var items: List<CharoInstance> = emptyList()
+    private val expandedState = mutableMapOf<String, Boolean>()
+
     fun submitList(newItems: List<CharoInstance>) {
+        val ids = newItems.map { it.instanceId }.toSet()
+        val iterator = expandedState.keys.iterator()
+        while (iterator.hasNext()) {
+            val key = iterator.next()
+            if (!ids.contains(key)) {
+                iterator.remove()
+            }
+        }
+        newItems.forEach { expandedState.putIfAbsent(it.instanceId, false) }
         items = newItems
         notifyDataSetChanged()
     }
+
+    private fun isExpanded(id: String): Boolean = expandedState[id] ?: false
+
+    private fun toggle(id: String) {
+        val current = expandedState[id] ?: false
+        expandedState[id] = !current
+        notifyDataSetChanged()
+    }
+
+    fun resetExpandedState() {
+        expandedState.keys.forEach { expandedState[it] = false }
+        notifyDataSetChanged()
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CharitoVH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_charito_instance, parent, false)
-        return CharitoVH(v)
+        return CharitoVH(v) { toggle(it) }
     }
+
     override fun getItemCount(): Int = items.size
+
     override fun onBindViewHolder(holder: CharitoVH, position: Int) {
-        holder.bind(items[position])
+        val item = items[position]
+        holder.bind(item, isExpanded(item.instanceId))
     }
 }
 
-class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
+class CharitoVH(view: View, private val onToggle: (String) -> Unit) : RecyclerView.ViewHolder(view) {
     private val title: TextView = view.findViewById(R.id.txt_charito_tile_title)
     private val aliasLabel: TextView = view.findViewById(R.id.txt_charito_tile_alias)
     private val status: TextView = view.findViewById(R.id.txt_charito_tile_status)
@@ -276,8 +306,10 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
     private val networkContainer: LinearLayout = view.findViewById(R.id.container_charito_networks)
     private val processTitle: TextView = view.findViewById(R.id.txt_charito_processes_title)
     private val processContainer: LinearLayout = view.findViewById(R.id.container_charito_processes)
+    private val detailsContainer: LinearLayout = view.findViewById(R.id.charito_details_container)
+    private val toggleIcon: ImageView = view.findViewById(R.id.img_charito_toggle)
 
-    fun bind(item: CharoInstance) {
+    fun bind(item: CharoInstance, expanded: Boolean) {
         val ctx = itemView.context
         val displayId = item.instanceId.ifBlank { item.alias ?: ctx.getString(R.string.charo_instance_unknown_id) }
         title.text = displayId
@@ -318,6 +350,9 @@ class CharitoVH(view: View) : RecyclerView.ViewHolder(view) {
         bindMetric(item.memInstantPercent, memInstValue, memInstProgress, R.string.charo_mem_na)
         renderNetworks(item.interfaces)
         renderProcesses(item.processes)
+        detailsContainer.isVisible = expanded
+        toggleIcon.rotation = if (expanded) 180f else 0f
+        itemView.setOnClickListener { onToggle(item.instanceId) }
     }
 
     private fun bindMetric(
