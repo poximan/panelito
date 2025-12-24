@@ -21,7 +21,7 @@ object MqttConfig {
 
     // Estado REMOTO del modem, NO confundir con estado del broker local
     const val TOPIC_MODEM_CONEXION =
-        "$BASE/estado/conexion_modem" // payload JSON: {"estado":"conectado","ts":"..."}
+        "$BASE/estado/conexion_modem" // payload JSON: {"estado":"abierto|cerrado|desconocido","ts":"..."}
     const val TOPIC_GRADO =
         "$BASE/estado/grado" // payload JSON: {"porcentaje": 58.3, "total": N, "conectados": M, "ts": "..."}
     const val TOPIC_GRDS =

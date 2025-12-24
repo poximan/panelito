@@ -121,7 +121,7 @@ class MQTTService : Service(), MqttCallbackExtended {
     private var lastEmailEstado: String? = null
     private var lastProxmoxEstado: String? = null
     private var lastCharoSnapshot: String? = null
-    private var lastModemEstado: ModemEstado = ModemEstado.DESCONECTADO
+    private var lastModemEstado: ModemEstado = ModemEstado.DESCONOCIDO
     private var backendOnline: Boolean = true
     private var lastBrokerEstado: BrokerEstado = BrokerEstado.DESCONECTADO
     private var coalesceJob: Job? = null
@@ -553,7 +553,7 @@ class MQTTService : Service(), MqttCallbackExtended {
                 lastGrdsJson = null
                 lastEmailEstado = null
                 lastProxmoxEstado = null
-                lastModemEstado = ModemEstado.DESCONECTADO
+                lastModemEstado = ModemEstado.DESCONOCIDO
             }
         } catch (ex: Exception) {
             val detail = ex.message ?: getString(R.string.status_unknown)
@@ -717,12 +717,22 @@ class MQTTService : Service(), MqttCallbackExtended {
             val parsed = JSONObject(raw)
             if (parsed.optString("type").equals("rpc", ignoreCase = true)) {
                 val data = parsed.optJSONObject("data")
-                data?.optString("estado", raw) ?: raw
+                data?.let { extractEstado(it, raw) } ?: raw
             } else {
-                parsed.optString("estado", raw)
+                extractEstado(parsed, raw)
             }
-        } catch (_: Exception) { raw }
-        return if (valor.equals("conectado", ignoreCase = true)) ModemEstado.CONECTADO else ModemEstado.DESCONECTADO
+        } catch (_: Exception) {
+            raw
+        }
+        return ModemEstado.fromString(valor)
+    }
+
+    private fun extractEstado(obj: JSONObject, fallback: String): String {
+        val estado = obj.optString("estado", "")
+        if (estado.isNotBlank()) return estado
+        val state = obj.optString("state", "")
+        if (state.isNotBlank()) return state
+        return fallback
     }
 
     private fun requestInitialState() {

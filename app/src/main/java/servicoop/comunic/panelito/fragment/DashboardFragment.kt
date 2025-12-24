@@ -20,6 +20,7 @@ import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.GrdDesconectado
 import servicoop.comunic.panelito.core.util.Thresholds
+import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.adapter.DisconnectedGrdAdapter
 
@@ -32,7 +33,7 @@ class DashboardFragment : Fragment() {
     private lateinit var indicatorSalud: View
     private lateinit var rvGrds: RecyclerView
     private lateinit var grdsAdapter: DisconnectedGrdAdapter
-    private var lastModemState: String? = null
+    private var lastModemState: ModemEstado? = null
 
     private val mqttReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -42,7 +43,8 @@ class DashboardFragment : Fragment() {
                     handleBrokerState(estado)
                 }
                 MQTTService.ACTION_MODEM_ESTADO -> {
-                    val estado = intent.getStringExtra(MQTTService.EXTRA_MODEM_ESTADO) ?: return
+                    val estadoRaw = intent.getStringExtra(MQTTService.EXTRA_MODEM_ESTADO) ?: return
+                    val estado = runCatching { ModemEstado.valueOf(estadoRaw) }.getOrElse { ModemEstado.DESCONOCIDO }
                     actualizarModemEstado(estado)
                 }
                 MQTTService.ACTION_ACTUALIZAR_GRADO -> {
@@ -131,17 +133,24 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun actualizarModemEstado(estado: String) {
+    private fun actualizarModemEstado(estado: ModemEstado) {
         lastModemState = estado
-        txtModem.text = getString(R.string.modem_status, estado)
-        if (estado.equals("CONECTADO", ignoreCase = true)) {
-            indicatorModem.setBackgroundResource(R.drawable.led_verde)
-        } else {
-            indicatorModem.setBackgroundResource(R.drawable.led_rojo)
+        val estadoTexto = when (estado) {
+            ModemEstado.ABIERTO -> getString(R.string.modem_state_open)
+            ModemEstado.CERRADO -> getString(R.string.modem_state_closed)
+            ModemEstado.DESCONOCIDO -> getString(R.string.status_unknown_capitalized)
         }
+        txtModem.text = getString(R.string.modem_status, estadoTexto)
+        val led = when (estado) {
+            ModemEstado.ABIERTO -> R.drawable.led_verde
+            ModemEstado.CERRADO -> R.drawable.led_rojo
+            ModemEstado.DESCONOCIDO -> R.drawable.led_naranja
+        }
+        indicatorModem.setBackgroundResource(led)
     }
 
     private fun mostrarModemSinDatos() {
+        lastModemState = ModemEstado.DESCONOCIDO
         txtModem.text = getString(R.string.modem_status, getString(R.string.status_unknown_capitalized))
         indicatorModem.setBackgroundResource(R.drawable.led_naranja)
     }
