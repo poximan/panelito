@@ -33,6 +33,8 @@ object MqttConfig {
     const val TOPIC_EMAIL_EVENT =
         "$BASE/eventos/email" // payload JSON: {"type":"email","subject":"...","ok":true,"ts":"..."}
     const val TOPIC_SERVICE_STATUS = "panelexemys/status" // payload JSON: {"status":"online|offline","ts":"...","reason":"..."}
+    const val TOPIC_GE_EMAR =
+        "$BASE/estado/ge_emar" // payload JSON: {"estado":"marcha|parado|desconocido","ts":"..."}
 
     // Publicaciones directas de charo-daemon por host (para N instancias)
     // Panelito se alimenta exclusivamente de estos topicos para la vista de charo-daemon.

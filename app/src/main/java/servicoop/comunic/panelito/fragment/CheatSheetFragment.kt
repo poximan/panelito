@@ -1,7 +1,10 @@
 package servicoop.comunic.panelito.fragment
 
 import android.content.ActivityNotFoundException
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -10,12 +13,15 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.core.model.GeEstado
+import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.adapter.CheatSheetAdapter
 import servicoop.comunic.panelito.ui.adapter.CheatSheetEntry
 import java.io.IOException
@@ -34,6 +40,18 @@ class CheatSheetFragment : Fragment() {
     }
     private val items = mutableListOf<CheatSheetEntry>()
 
+    private val mqttReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                MQTTService.ACTION_GE_EMAR_ESTADO -> {
+                    val raw = intent.getStringExtra(MQTTService.EXTRA_GE_EMAR_ESTADO) ?: return
+                    val estado = runCatching { GeEstado.valueOf(raw) }.getOrElse { GeEstado.DESCONOCIDO }
+                    updateGeStatus(estado)
+                }
+            }
+        }
+    }
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -50,9 +68,22 @@ class CheatSheetFragment : Fragment() {
         buildInitialItems()
     }
 
+    override fun onStart() {
+        super.onStart()
+        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
+            mqttReceiver,
+            IntentFilter(MQTTService.ACTION_GE_EMAR_ESTADO)
+        )
+    }
+
     override fun onDestroyView() {
         recyclerView.adapter = null
         super.onDestroyView()
+    }
+
+    override fun onStop() {
+        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(mqttReceiver)
+        super.onStop()
     }
 
     private fun buildInitialItems() {
@@ -78,12 +109,28 @@ class CheatSheetFragment : Fragment() {
             )
         )
         items.add(
-            CheatSheetEntry.TcpProbe(
+            CheatSheetEntry.Endpoint(
                 id = 3,
+                title = getString(R.string.cheat_sheet_web_com_title),
+                url = getString(R.string.cheat_sheet_web_com_url),
+                ip = getString(R.string.cheat_sheet_web_com_ip),
+                pingResult = defaultPingResult
+            )
+        )
+        items.add(
+            CheatSheetEntry.TcpProbe(
+                id = 4,
                 title = getString(R.string.cheat_sheet_modem_telef_title),
                 host = getString(R.string.cheat_sheet_modem_telef_host),
                 port = 40000,
                 result = defaultTcpResult
+            )
+        )
+        items.add(
+            CheatSheetEntry.GeStatus(
+                id = 5,
+                title = getString(R.string.cheat_sheet_ge_title),
+                estado = GeEstado.DESCONOCIDO
             )
         )
         items.add(CheatSheetEntry.Notes(getString(R.string.cheat_sheet_notes)))
@@ -170,6 +217,17 @@ class CheatSheetFragment : Fragment() {
             val current = items[index] as CheatSheetEntry.TcpProbe
             items[index] = transformer(current)
             submitItems()
+        }
+    }
+
+    private fun updateGeStatus(estado: GeEstado) {
+        val index = items.indexOfFirst { it is CheatSheetEntry.GeStatus }
+        if (index >= 0) {
+            val current = items[index] as CheatSheetEntry.GeStatus
+            if (current.estado != estado) {
+                items[index] = current.copy(estado = estado)
+                submitItems()
+            }
         }
     }
 

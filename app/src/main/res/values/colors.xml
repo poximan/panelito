@@ -1,2 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources></resources>
+<resources>
+    <color name="ge_led_marcha">#2ecc71</color>
+    <color name="ge_led_parado">#1e88e5</color>
+    <color name="ge_led_unknown">#b0bec5</color>
+</resources>

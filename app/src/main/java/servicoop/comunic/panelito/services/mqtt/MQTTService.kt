@@ -34,6 +34,7 @@ import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.EmailEvent
+import servicoop.comunic.panelito.core.model.GeEstado
 import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.data.mqtt.MqttConfig
 import java.util.Locale
@@ -82,6 +83,8 @@ class MQTTService : Service(), MqttCallbackExtended {
         const val ACTION_BACKEND_STATUS = "$ACTION_PREFIX.ACTION_BACKEND_STATUS"
         const val EXTRA_BACKEND_STATUS = "EXTRA_BACKEND_STATUS"
         const val EXTRA_BACKEND_STATUS_TS = "EXTRA_BACKEND_STATUS_TS"
+        const val ACTION_GE_EMAR_ESTADO = "$ACTION_PREFIX.ACTION_GE_EMAR_ESTADO"
+        const val EXTRA_GE_EMAR_ESTADO = "EXTRA_GE_EMAR_ESTADO"
 
         // Pedido de estado desde UI
         const val EXTRA_SOLICITAR_ESTADO = "solicitar_estado"
@@ -121,6 +124,7 @@ class MQTTService : Service(), MqttCallbackExtended {
     private var lastEmailEstado: String? = null
     private var lastProxmoxEstado: String? = null
     private var lastCharoSnapshot: String? = null
+    private var lastGeEstado: GeEstado = GeEstado.DESCONOCIDO
     private var lastModemEstado: ModemEstado = ModemEstado.DESCONOCIDO
     private var backendOnline: Boolean = true
     private var lastBrokerEstado: BrokerEstado = BrokerEstado.DESCONECTADO
@@ -271,6 +275,7 @@ class MQTTService : Service(), MqttCallbackExtended {
             mqttClient.subscribe(MqttConfig.TOPIC_CHARODAEMON_STATUS, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_CHARODAEMON_METRICS, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_CHARITO_WHITELIST, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.TOPIC_GE_EMAR, MqttConfig.QOS_SUBS)
         } catch (e: Exception) {
             val detail = e.message ?: getString(R.string.status_unknown)
             sendError(getString(R.string.error_subscription, detail))
@@ -344,6 +349,11 @@ class MQTTService : Service(), MqttCallbackExtended {
             }
             MqttConfig.TOPIC_CHARITO_WHITELIST -> {
                 handleCharoWhitelist(payload)
+            }
+            MqttConfig.TOPIC_GE_EMAR -> {
+                val estado = parseGeEstado(payload)
+                lastGeEstado = estado
+                enviarGeEstado(estado)
             }
             else -> handleCharoTopic(topic, payload)
         }
@@ -445,6 +455,11 @@ class MQTTService : Service(), MqttCallbackExtended {
     private fun enviarModemEstado(estado: ModemEstado) {
         val i = Intent(ACTION_MODEM_ESTADO).apply { putExtra(EXTRA_MODEM_ESTADO, estado.name) }
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
+    }
+
+    private fun enviarGeEstado(estado: GeEstado) {
+        val intent = Intent(ACTION_GE_EMAR_ESTADO).apply { putExtra(EXTRA_GE_EMAR_ESTADO, estado.name) }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 
     private fun enviarEmailEstado(jsonRaw: String) {
@@ -735,6 +750,16 @@ class MQTTService : Service(), MqttCallbackExtended {
         return fallback
     }
 
+    private fun parseGeEstado(raw: String): GeEstado {
+        val valor = try {
+            val parsed = JSONObject(raw)
+            parsed.optString("estado", raw)
+        } catch (_: Exception) {
+            raw
+        }
+        return GeEstado.fromString(valor)
+    }
+
     private fun requestInitialState() {
         sendRpcRequest("get_global_status", MqttConfig.TOPIC_GRADO)
         sendRpcRequest("get_modem_status", MqttConfig.TOPIC_MODEM_CONEXION)
@@ -776,5 +801,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         lastProxmoxEstado?.let { enviarProxmoxEstado(it) }
         lastCharoSnapshot?.let { enviarCharitoEstado(it) }
         enviarBrokerEstado(if (isConnected) BrokerEstado.CONECTADO else BrokerEstado.DESCONECTADO)
+        enviarGeEstado(lastGeEstado)
     }
 }
