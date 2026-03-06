@@ -94,11 +94,9 @@ class CharitoFragment : Fragment() {
                 val receivedAt = current.optString("receivedAt", current.optString("generatedAt", ""))
                 val samples = current.optInt("samples", 0)
                 val window = current.optLong("windowSeconds", 0L)
-                val avgCpu = current.optDouble("averageCpuLoad", Double.NaN)
-                val avgMemRatio = current.optDouble("averageMemoryUsageRatio", Double.NaN)
-                val instCpu = current.optDouble("cpuLoadInstant", Double.NaN)
-                val instMem = current.optDouble("memoryUsageInstant", Double.NaN)
-                val tempInstant = current.optDouble("cpuTemperatureInstant", Double.NaN)
+                val cpuLoad = current.optDouble("cpuLoad", Double.NaN)
+                val memRatio = current.optDouble("memoryUsageRatio", Double.NaN)
+                val tempInstant = current.optDouble("cpuTemperatureCelsius", Double.NaN)
                 val status = current.optString("status", "")
                 val processes = extractProcesses(current)
                 val interfaces = extractInterfaces(current)
@@ -108,10 +106,8 @@ class CharitoFragment : Fragment() {
                         receivedAt = receivedAt,
                         samples = samples,
                         windowSeconds = window,
-                        avgCpuPercent = percentOrNull(avgCpu),
-                        avgMemPercent = percentOrNull(avgMemRatio),
-                        cpuInstantPercent = percentOrNull(instCpu),
-                        memInstantPercent = percentOrNull(instMem),
+                        cpuPercent = percentOrNull(cpuLoad),
+                        memPercent = percentOrNull(memRatio),
                         cpuTempCelsius = tempInstant.takeIf { !it.isNaN() && it >= 0.0 },
                         status = status,
                         processes = processes,
@@ -212,10 +208,8 @@ data class CharoInstance(
     val receivedAt: String,
     val samples: Int,
     val windowSeconds: Long,
-    val avgCpuPercent: Double?,
-    val avgMemPercent: Double?,
-    val cpuInstantPercent: Double?,
-    val memInstantPercent: Double?,
+    val cpuPercent: Double?,
+    val memPercent: Double?,
     val cpuTempCelsius: Double?,
     val status: String,
     val processes: List<CharoProcess>,
@@ -293,15 +287,11 @@ class CharitoVH(view: View, private val onToggle: (String) -> Unit) : RecyclerVi
     private val indicator: View = view.findViewById(R.id.indicator_charito_status)
     private val updated: TextView = view.findViewById(R.id.txt_charito_tile_updated)
     private val window: TextView = view.findViewById(R.id.txt_charito_tile_window)
-    private val cpuAvgValue: TextView = view.findViewById(R.id.txt_charito_tile_cpu_avg_value)
-    private val cpuAvgProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu_avg)
-    private val cpuInstValue: TextView = view.findViewById(R.id.txt_charito_tile_cpu_inst_value)
-    private val cpuInstProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu_inst)
+    private val cpuValue: TextView = view.findViewById(R.id.txt_charito_tile_cpu_value)
+    private val cpuProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_cpu)
     private val tempValue: TextView = view.findViewById(R.id.txt_charito_tile_temp_value)
-    private val memAvgValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_avg_value)
-    private val memAvgProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory_avg)
-    private val memInstValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_inst_value)
-    private val memInstProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory_inst)
+    private val memValue: TextView = view.findViewById(R.id.txt_charito_tile_memory_value)
+    private val memProgress: android.widget.ProgressBar = view.findViewById(R.id.progress_charito_memory)
     private val networkTitle: TextView = view.findViewById(R.id.txt_charito_network_title)
     private val networkContainer: LinearLayout = view.findViewById(R.id.container_charito_networks)
     private val processTitle: TextView = view.findViewById(R.id.txt_charito_processes_title)
@@ -342,12 +332,10 @@ class CharitoVH(view: View, private val onToggle: (String) -> Unit) : RecyclerVi
         )
         window.text = ctx.getString(R.string.charo_tile_window_format, samplesText, item.windowSeconds)
 
-        bindMetric(item.avgCpuPercent, cpuAvgValue, cpuAvgProgress, R.string.charo_cpu_na)
-        bindMetric(item.cpuInstantPercent, cpuInstValue, cpuInstProgress, R.string.charo_cpu_na)
+        bindMetric(item.cpuPercent, cpuValue, cpuProgress, R.string.charo_cpu_na)
         tempValue.text = item.cpuTempCelsius?.let { ctx.getString(R.string.charo_temp_format, it) }
             ?: ctx.getString(R.string.charo_temp_na)
-        bindMetric(item.avgMemPercent, memAvgValue, memAvgProgress, R.string.charo_mem_na)
-        bindMetric(item.memInstantPercent, memInstValue, memInstProgress, R.string.charo_mem_na)
+        bindMetric(item.memPercent, memValue, memProgress, R.string.charo_mem_na)
         renderNetworks(item.interfaces)
         renderProcesses(item.processes)
         detailsContainer.isVisible = expanded
