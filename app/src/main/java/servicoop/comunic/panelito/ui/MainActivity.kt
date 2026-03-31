@@ -30,6 +30,7 @@ import servicoop.comunic.panelito.fragment.CheatSheetFragment
 import servicoop.comunic.panelito.fragment.DashboardFragment
 import servicoop.comunic.panelito.fragment.EmailEventsFragment
 import servicoop.comunic.panelito.fragment.ProxmoxFragment
+import servicoop.comunic.panelito.fragment.TelefonosFragment
 import servicoop.comunic.panelito.repository.SettingsRepository
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 
@@ -87,7 +88,7 @@ class MainActivity : AppCompatActivity() {
         viewPager = findViewById(R.id.view_pager)
 
         viewPager.adapter = MainPagerAdapter(this)
-        viewPager.offscreenPageLimit = 4
+        viewPager.offscreenPageLimit = 5
 
         switchConnect.setOnCheckedChangeListener { _, isChecked ->
             if (suppressSwitchChange) return@setOnCheckedChangeListener
@@ -139,6 +140,15 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(brokerReceiver)
         super.onStop()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (switchConnect.isChecked) {
+            requestServiceState()
+        } else {
+            broadcastBrokerState(BrokerEstado.DESCONECTADO)
+        }
     }
 
     private fun setSwitchWithoutTrigger(value: Boolean) {
@@ -245,13 +255,14 @@ class MainActivity : AppCompatActivity() {
     fun isBrokerDesiredEnabled(): Boolean = desiredServiceEnabled
 
     private class MainPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
-        override fun getItemCount(): Int = 5
+        override fun getItemCount(): Int = 6
 
         override fun createFragment(position: Int) = when (position) {
             0 -> DashboardFragment.newInstance()
             1 -> ProxmoxFragment.newInstance()
             2 -> CharitoFragment.newInstance()
             3 -> EmailEventsFragment.newInstance()
+            4 -> TelefonosFragment.newInstance()
             else -> CheatSheetFragment.newInstance()
         }
     }

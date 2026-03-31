@@ -23,6 +23,7 @@ import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.util.TimestampFormatter
 import servicoop.comunic.panelito.services.mqtt.MQTTService
+import servicoop.comunic.panelito.ui.MainActivity
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -63,6 +64,7 @@ class CharitoFragment : Fragment() {
             receiver,
             IntentFilter(MQTTService.ACTION_CHARITO_ESTADO)
         )
+        requestCachedState()
         adapter.resetExpandedState()
         lastPayload?.let { parseAndRender(it) } ?: run {
             empty.isVisible = true
@@ -79,6 +81,15 @@ class CharitoFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         lastPayload?.let { outState.putString("charito_last_state", it) }
+    }
+
+    private fun requestCachedState() {
+        val hostActivity = activity as? MainActivity ?: return
+        if (!hostActivity.isBrokerDesiredEnabled()) return
+        val intent = Intent(requireContext(), MQTTService::class.java).apply {
+            putExtra(MQTTService.EXTRA_SOLICITAR_ESTADO, true)
+        }
+        requireContext().startService(intent)
     }
 
     private fun parseAndRender(raw: String) {

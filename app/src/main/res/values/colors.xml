@@ -3,4 +3,11 @@
     <color name="ge_led_marcha">#2ecc71</color>
     <color name="ge_led_parado">#1e88e5</color>
     <color name="ge_led_unknown">#b0bec5</color>
+    <color name="telefono_screen_bg">#F3F6F9</color>
+    <color name="telefono_card_bg">#FFFFFF</color>
+    <color name="telefono_card_stroke">#D7DEE7</color>
+    <color name="telefono_section_text">#0F2D44</color>
+    <color name="telefono_number_text">#0B57D0</color>
+    <color name="telefono_comment_text">#2E4A60</color>
+    <color name="telefono_hint_text">#46627A</color>
 </resources>

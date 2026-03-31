@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="telefono_screen_bg">#0F1720</color>
+    <color name="telefono_card_bg">#1A2733</color>
+    <color name="telefono_card_stroke">#334453</color>
+    <color name="telefono_section_text">#E6EDF3</color>
+    <color name="telefono_number_text">#9BC0FF</color>
+    <color name="telefono_comment_text">#C8D3DE</color>
+    <color name="telefono_hint_text">#A7B5C2</color>
+</resources>

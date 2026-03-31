@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "servicoop.comunic.panelito"
         minSdk = 28
-        targetSdk = 33
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
     }
@@ -30,6 +30,11 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+    }
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 

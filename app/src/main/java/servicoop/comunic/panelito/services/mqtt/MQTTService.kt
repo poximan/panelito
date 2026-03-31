@@ -134,6 +134,7 @@ class MQTTService : Service(), MqttCallbackExtended {
     private val charoHosts: MutableMap<String, CharoHostState> = mutableMapOf()
     @Volatile private var charoWhitelist: Set<String> = emptySet()
     private val charoAliasToId: MutableMap<String, String> = mutableMapOf()
+    private val charoIdToAlias: MutableMap<String, String> = mutableMapOf()
 
     private data class CharoHostState(
         var topicId: String,
@@ -142,6 +143,7 @@ class MQTTService : Service(), MqttCallbackExtended {
         var status: String = STATUS_UNKNOWN,
         var metrics: JSONObject? = null,
         var lastSeenMs: Long = System.currentTimeMillis(),
+        var lastMetricsSeenMs: Long = 0L,
         var timeoutMs: Long = CHARO_TIMEOUT_MS
     )
 
@@ -515,7 +517,7 @@ class MQTTService : Service(), MqttCallbackExtended {
         if (topic.isNullOrBlank()) return
         when {
             topic.startsWith("charodaemon/host/") && topic.endsWith("/metrics") -> updateCharoMetrics(topic, payload)
-            topic.startsWith("charodaemon/host/") && topic.endsWith("/status") -> updateCharoStatus(topic, payload)
+            topic.startsWith("charodaemon/host/") && topic.endsWith("/status") -> updateCharoStatus(topic)
         }
     }
 
@@ -525,6 +527,7 @@ class MQTTService : Service(), MqttCallbackExtended {
             val array = json.optJSONArray("items") ?: JSONArray()
             val ids = mutableSetOf<String>()
             val newAliasMap = mutableMapOf<String, String>()
+            val newIdMap = mutableMapOf<String, String>()
 
             for (index in 0 until array.length()) {
                 val entry = array.optJSONObject(index) ?: continue
@@ -534,6 +537,7 @@ class MQTTService : Service(), MqttCallbackExtended {
 
                 ids += id
                 newAliasMap[alias] = id
+                newIdMap[id] = alias
 
                 ensureCharoPlaceholder(id, alias)
 
@@ -545,6 +549,8 @@ class MQTTService : Service(), MqttCallbackExtended {
 
             charoAliasToId.clear()
             charoAliasToId.putAll(newAliasMap)
+            charoIdToAlias.clear()
+            charoIdToAlias.putAll(newIdMap)
             charoWhitelist = ids
             pruneCharoHostsByWhitelist()
             broadcastCharoState()
@@ -601,16 +607,15 @@ class MQTTService : Service(), MqttCallbackExtended {
             val topicId = extractCharoTopicId(topic)
                 ?: metricsJson.optString("instanceId").takeIf { it.isNotBlank() }
                 ?: return
-            val entry = charoHosts.getOrPut(topicId) { CharoHostState(topicId = topicId) }
-            val instanceId = metricsJson.optString("instanceId")
-            if (instanceId.isNotBlank()) {
-                entry.instanceId = instanceId
-            }
+            val payloadInstanceId = metricsJson.optString("instanceId").takeIf { it.isNotBlank() }
+            val entry = resolveCharoHost(topicId, payloadInstanceId)
             if (!isCharoAllowed(entry.instanceId)) {
-                charoHosts.remove(entry.topicId)
+                removeCharoHost(entry)
                 return
             }
-            markCharoHeartbeat(entry)
+            val nowMs = System.currentTimeMillis()
+            markCharoHeartbeat(entry, nowMs)
+            entry.lastMetricsSeenMs = nowMs
             if (entry.status != STATUS_ONLINE) {
                 entry.status = STATUS_ONLINE
             }
@@ -626,20 +631,18 @@ class MQTTService : Service(), MqttCallbackExtended {
         }
     }
 
-    private fun updateCharoStatus(topic: String, payload: String) {
+    private fun updateCharoStatus(topic: String) {
         val topicId = extractCharoTopicId(topic) ?: return
-        val normalized = payload.trim().lowercase(Locale.getDefault())
-        val entry = charoHosts.getOrPut(topicId) { CharoHostState(topicId = topicId) }
+        val entry = resolveCharoHost(topicId, null)
         if (!isCharoAllowed(entry.instanceId)) {
-            charoHosts.remove(entry.topicId)
+            removeCharoHost(entry)
             return
         }
-        markCharoHeartbeat(entry)
-        entry.status = when (normalized) {
-            STATUS_ONLINE -> STATUS_ONLINE
-            STATUS_OFFLINE -> STATUS_OFFLINE
-            else -> STATUS_UNKNOWN
-        }
+        val nowMs = System.currentTimeMillis()
+        markCharoHeartbeat(entry, nowMs)
+        // La presencia del heartbeat en el topico /status indica host vivo.
+        // El estado offline se determina por timeout sin actividad.
+        entry.status = STATUS_ONLINE
         broadcastCharoState()
     }
 
@@ -648,8 +651,36 @@ class MQTTService : Service(), MqttCallbackExtended {
         return if (parts.size >= 3) parts[2] else null
     }
 
-    private fun markCharoHeartbeat(entry: CharoHostState) {
-        entry.lastSeenMs = System.currentTimeMillis()
+    private fun markCharoHeartbeat(entry: CharoHostState, nowMs: Long = System.currentTimeMillis()) {
+        entry.lastSeenMs = nowMs
+    }
+
+    private fun resolveCharoHost(topicId: String, payloadInstanceId: String?): CharoHostState {
+        val normalizedTopicId = topicId.trim()
+        val normalizedPayloadId = payloadInstanceId?.trim().orEmpty()
+        val mappedId = charoAliasToId[normalizedTopicId].orEmpty()
+        val resolvedId = when {
+            normalizedPayloadId.isNotBlank() -> normalizedPayloadId
+            mappedId.isNotBlank() -> mappedId
+            else -> normalizedTopicId
+        }
+        val resolvedAlias = charoIdToAlias[resolvedId].orEmpty().ifBlank { normalizedTopicId }
+
+        val existingByResolved = charoHosts[resolvedId]
+        val existingByTopic = if (resolvedId != normalizedTopicId) charoHosts.remove(normalizedTopicId) else null
+        val entry = existingByResolved ?: existingByTopic ?: CharoHostState(topicId = normalizedTopicId)
+        entry.topicId = normalizedTopicId
+        entry.instanceId = resolvedId
+        entry.alias = resolvedAlias
+        charoHosts[resolvedId] = entry
+        return entry
+    }
+
+    private fun removeCharoHost(entry: CharoHostState) {
+        charoHosts.remove(entry.instanceId)
+        if (entry.topicId.isNotBlank() && entry.topicId != entry.instanceId) {
+            charoHosts.remove(entry.topicId)
+        }
     }
 
     private fun isCharoAllowed(instanceId: String?): Boolean {
