@@ -100,7 +100,7 @@ class CharitoFragment : Fragment() {
             for (i in 0 until items.length()) {
                 val current = items.optJSONObject(i) ?: continue
                 val alias = current.optString("alias")
-                val id = current.optString("instanceId").ifBlank { current.optString("topicId") }
+                val id = current.optString("instanceId")
                 if (id.isBlank()) continue
                 val receivedAt = current.optString("receivedAt", current.optString("generatedAt", ""))
                 val samples = current.optInt("samples", 0)
@@ -326,6 +326,10 @@ class CharitoVH(view: View, private val onToggle: (String) -> Unit) : RecyclerVi
             "offline" -> {
                 indicator.setBackgroundResource(R.drawable.led_rojo)
                 ctx.getString(R.string.charo_status_offline_short)
+            }
+            "error" -> {
+                indicator.setBackgroundResource(R.drawable.led_naranja)
+                ctx.getString(R.string.charo_status_error_short)
             }
             else -> {
                 indicator.setBackgroundResource(R.drawable.led_naranja)

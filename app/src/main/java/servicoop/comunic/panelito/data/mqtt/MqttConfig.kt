@@ -17,32 +17,35 @@ object MqttConfig {
     const val RECONNECT_MAX_BACKOFF_SECONDS = 120
 
     // Convencion de topicos (publicados por el server Python)
-    private const val BASE = "exemys"
+    private const val BASE = "lechuza-server"
 
     // Estado REMOTO del modem, NO confundir con estado del broker local
     const val TOPIC_MODEM_CONEXION =
-        "$BASE/estado/conexion_modem" // payload JSON: {"estado":"abierto|cerrado|desconocido","ts":"..."}
+        "$BASE/router/status" // payload JSON: {"estado":"abierto|cerrado|desconocido","ts":"..."}
     const val TOPIC_GRADO =
-        "$BASE/estado/grado" // payload JSON: {"porcentaje": 58.3, "total": N, "conectados": M, "ts": "..."}
+        "$BASE/modbus/grd/summary" // payload JSON: {"porcentaje": 58.3, "total": N, "conectados": M, "ts": "..."}
     const val TOPIC_GRDS =
-        "$BASE/estado/grds" // payload JSON: {"items":[{"id":11,"nombre":"...", "ultima_caida":"..."}], "ts":"..."}
+        "$BASE/modbus/grd/disconnected" // payload JSON: {"items":[{"id":11,"nombre":"...", "ultima_caida":"..."}], "ts":"..."}
     const val TOPIC_EMAIL_ESTADO =
-        "$BASE/estado/email" // payload JSON: {"smtp":"conectado","ping_local":"...","ping_remoto":"...","ts":"..."}
+        "$BASE/email/status" // payload JSON: {"smtp":"conectado","ping_local":"...","ping_remoto":"...","ts":"..."}
     const val TOPIC_PROXMOX_ESTADO =
-        "$BASE/estado/proxmox" // payload JSON: {"ts":"...","status":"online|offline","vms":[...],"missing":[...]}
+        "$BASE/pve/status" // payload JSON: {"ts":"...","status":"online|offline","vms":[...],"missing":[...]}
     const val TOPIC_EMAIL_EVENT =
-        "$BASE/eventos/email" // payload JSON: {"type":"email","subject":"...","ok":true,"ts":"..."}
+        "$BASE/email/event" // payload JSON: {"type":"email","subject":"...","ok":true,"ts":"..."}
     const val TOPIC_SERVICE_STATUS = "panelexemys/status" // payload JSON: {"status":"online|offline","ts":"...","reason":"..."}
     const val TOPIC_GE_EMAR =
-        "$BASE/estado/ge_emar" // payload JSON: {"estado":"marcha|parado|desconocido","ts":"..."}
+        "$BASE/modbus/ge/status" // payload JSON: {"estado":"marcha|parado|desconocido","ts":"..."}
 
-    // Publicaciones directas de charo-daemon por host (para N instancias)
-    // Panelito se alimenta exclusivamente de estos topicos para la vista de charo-daemon.
-    const val TOPIC_CHARODAEMON_STATUS = "charodaemon/host/+/status"
-    const val TOPIC_CHARODAEMON_METRICS = "charodaemon/host/+/metrics"
-    const val TOPIC_CHARITO_WHITELIST = "charito/whitelist/instances"
+    // Estado consolidado de charo-daemon publicado por charito-service.
+    // Panelito no consume topicos directos de charo-daemon.
+    const val TOPIC_CHARITO_STATE = "charito/state"
 
-    const val RPC_ROOT = "app/req"
+    const val RPC_REQ_ROOT = "lechuza-server/rpc/req"
+    const val RPC_RES_ROOT = "lechuza-server/rpc/res"
+
+    fun rpcResponseSubscription(clientId: String): String = "$RPC_RES_ROOT/$clientId/+"
+
+    fun rpcResponseTopic(clientId: String, corr: String): String = "$RPC_RES_ROOT/$clientId/$corr"
 
     // QoS recomendado
     const val QOS_SUBS = 1

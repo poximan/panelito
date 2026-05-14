@@ -29,7 +29,6 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttException
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
-import org.json.JSONArray
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
@@ -37,7 +36,6 @@ import servicoop.comunic.panelito.core.model.EmailEvent
 import servicoop.comunic.panelito.core.model.GeEstado
 import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.data.mqtt.MqttConfig
-import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.min
@@ -52,8 +50,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         const val STATUS_ONLINE = "online"
         const val STATUS_OFFLINE = "offline"
         private const val STATUS_UNKNOWN = "unknown"
-        private const val CHARO_TIMEOUT_MS = 90_000L
-        private const val CHARO_TIMEOUT_TICK_MS = 30_000L
 
         // Broadcasts a UI
         const val ACTION_BROKER_ESTADO = "$ACTION_PREFIX.ACTION_BROKER_ESTADO"
@@ -116,7 +112,6 @@ class MQTTService : Service(), MqttCallbackExtended {
     private lateinit var cm: ConnectivityManager
     private var reconnectJob: Job? = null
     private var defaultNetCallback: ConnectivityManager.NetworkCallback? = null
-    private var charoTimeoutJob: Job? = null
 
     // Debounce / cache
     private var lastGradoPct: Double? = null
@@ -131,21 +126,6 @@ class MQTTService : Service(), MqttCallbackExtended {
     private var coalesceJob: Job? = null
     @Volatile private var pendingGrado: Double? = null
     @Volatile private var pendingGrds: String? = null
-    private val charoHosts: MutableMap<String, CharoHostState> = mutableMapOf()
-    @Volatile private var charoWhitelist: Set<String> = emptySet()
-    private val charoAliasToId: MutableMap<String, String> = mutableMapOf()
-    private val charoIdToAlias: MutableMap<String, String> = mutableMapOf()
-
-    private data class CharoHostState(
-        var topicId: String,
-        var instanceId: String = topicId,
-        var alias: String = topicId,
-        var status: String = STATUS_UNKNOWN,
-        var metrics: JSONObject? = null,
-        var lastSeenMs: Long = System.currentTimeMillis(),
-        var lastMetricsSeenMs: Long = 0L,
-        var timeoutMs: Long = CHARO_TIMEOUT_MS
-    )
 
     private lateinit var options: MqttConnectOptions
 
@@ -186,12 +166,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         }
         defaultNetCallback = cb
         cm.registerDefaultNetworkCallback(cb)
-        charoTimeoutJob = scope.launch {
-            while (isActive) {
-                enforceCharoTimeout()
-                delay(CHARO_TIMEOUT_TICK_MS)
-            }
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -218,7 +192,7 @@ class MQTTService : Service(), MqttCallbackExtended {
 
         if (action == ACTION_RPC_EMAIL_TEST) {
             val params = JSONObject().apply { put("origin", "panelito") }
-            sendRpcRequest("send_email_test", MqttConfig.TOPIC_EMAIL_EVENT, params)
+            sendRpcRequest("send_email_test", params)
             return START_STICKY
         }
 
@@ -233,8 +207,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         try { defaultNetCallback?.let { cm.unregisterNetworkCallback(it) } } catch (_: Exception) {}
         cancelReconnectLoop()
         scope.launch { disconnectSafely() }
-        charoTimeoutJob?.cancel()
-        charoTimeoutJob = null
         svcJob.cancel()
         actualizarNotificacion(
             getString(R.string.notification_text_service_stopped_title),
@@ -273,11 +245,9 @@ class MQTTService : Service(), MqttCallbackExtended {
             mqttClient.subscribe(MqttConfig.TOPIC_PROXMOX_ESTADO, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_EMAIL_EVENT, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_SERVICE_STATUS, MqttConfig.QOS_SUBS)
-            // Suscripciones directas a charo-daemon por host (N instancias)
-            mqttClient.subscribe(MqttConfig.TOPIC_CHARODAEMON_STATUS, MqttConfig.QOS_SUBS)
-            mqttClient.subscribe(MqttConfig.TOPIC_CHARODAEMON_METRICS, MqttConfig.QOS_SUBS)
-            mqttClient.subscribe(MqttConfig.TOPIC_CHARITO_WHITELIST, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.TOPIC_CHARITO_STATE, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_GE_EMAR, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.rpcResponseSubscription(clientId), MqttConfig.QOS_SUBS)
         } catch (e: Exception) {
             val detail = e.message ?: getString(R.string.status_unknown)
             sendError(getString(R.string.error_subscription, detail))
@@ -287,6 +257,10 @@ class MQTTService : Service(), MqttCallbackExtended {
 
     override fun messageArrived(topic: String?, message: MqttMessage?) {
         val payload = message?.toString() ?: return
+        if (!topic.isNullOrBlank() && topic.startsWith("${MqttConfig.RPC_RES_ROOT}/$clientId/")) {
+            handleRpcResponse(payload)
+            return
+        }
         when (topic) {
             MqttConfig.TOPIC_MODEM_CONEXION -> {
                 lastModemEstado = parseModemEstado(payload)
@@ -295,20 +269,6 @@ class MQTTService : Service(), MqttCallbackExtended {
             MqttConfig.TOPIC_GRADO -> {
                 try {
                     val parsed = JSONObject(payload)
-                    if (parsed.optString("type").equals("rpc", ignoreCase = true)) {
-                        val ok = parsed.optBoolean("ok", true)
-                        if (!ok) {
-                            val detail = parsed.optString("error", getString(R.string.status_unknown))
-                            sendError(getString(R.string.error_rpc_global_status, detail))
-                        } else {
-                            val pct = parsed.optJSONObject("data")?.optJSONObject("summary")?.optDouble("porcentaje", Double.NaN)
-                            if (pct != null && !pct.isNaN()) {
-                                pendingGrado = pct
-                                coalesceUi()
-                            }
-                        }
-                        return
-                    }
                     val pct = parsed.optDouble("porcentaje", Double.NaN)
                     if (!pct.isNaN()) {
                         pendingGrado = pct
@@ -349,15 +309,14 @@ class MQTTService : Service(), MqttCallbackExtended {
             MqttConfig.TOPIC_SERVICE_STATUS -> {
                 handleBackendStatus(payload)
             }
-            MqttConfig.TOPIC_CHARITO_WHITELIST -> {
-                handleCharoWhitelist(payload)
+            MqttConfig.TOPIC_CHARITO_STATE -> {
+                handleCharitoState(payload)
             }
             MqttConfig.TOPIC_GE_EMAR -> {
                 val estado = parseGeEstado(payload)
                 lastGeEstado = estado
                 enviarGeEstado(estado)
             }
-            else -> handleCharoTopic(topic, payload)
         }
     }
 
@@ -479,6 +438,52 @@ class MQTTService : Service(), MqttCallbackExtended {
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
     }
 
+    private fun handleCharitoState(payload: String) {
+        try {
+            val parsed = JSONObject(payload)
+            if (parsed.optJSONArray("items") == null) {
+                throw IllegalArgumentException("El campo obligatorio 'items' debe ser una lista")
+            }
+            lastCharoSnapshot = payload
+            enviarCharitoEstado(payload)
+        } catch (ex: Exception) {
+            val detail = ex.message ?: getString(R.string.status_unknown)
+            sendError(getString(R.string.error_parse_charo_metrics, detail))
+        }
+    }
+
+    private fun handleRpcResponse(payload: String) {
+        try {
+            val parsed = JSONObject(payload)
+            val action = parsed.getString("action")
+            val ok = parsed.getBoolean("ok")
+            if (!ok) {
+                val detail = parsed.optString("error", getString(R.string.status_unknown))
+                sendError(getString(R.string.error_rpc_action, action, detail))
+                return
+            }
+            val data = parsed.optJSONObject("data") ?: JSONObject()
+            when (action) {
+                "get_global_status" -> {
+                    val pct = data.optJSONObject("summary")?.optDouble("porcentaje", Double.NaN)
+                    if (pct != null && !pct.isNaN()) {
+                        pendingGrado = pct
+                        coalesceUi()
+                    }
+                }
+                "get_modem_status" -> {
+                    lastModemEstado = ModemEstado.fromString(data.optString("estado", "desconocido"))
+                    enviarModemEstado(lastModemEstado)
+                }
+                "send_email_test" -> Unit
+                else -> sendError(getString(R.string.error_rpc_unknown_action, action))
+            }
+        } catch (ex: Exception) {
+            val detail = ex.message ?: getString(R.string.status_unknown)
+            sendError(getString(R.string.error_rpc_parse, detail))
+        }
+    }
+
     private fun enviarBackendStatus(online: Boolean, timestamp: String?) {
         val intent = Intent(ACTION_BACKEND_STATUS).apply {
             putExtra(EXTRA_BACKEND_STATUS, if (online) STATUS_ONLINE else STATUS_OFFLINE)
@@ -513,52 +518,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
     }
 
-    private fun handleCharoTopic(topic: String?, payload: String) {
-        if (topic.isNullOrBlank()) return
-        when {
-            topic.startsWith("charodaemon/host/") && topic.endsWith("/metrics") -> updateCharoMetrics(topic, payload)
-            topic.startsWith("charodaemon/host/") && topic.endsWith("/status") -> updateCharoStatus(topic)
-        }
-    }
-
-    private fun handleCharoWhitelist(payload: String) {
-        try {
-            val json = JSONObject(payload)
-            val array = json.optJSONArray("items") ?: JSONArray()
-            val ids = mutableSetOf<String>()
-            val newAliasMap = mutableMapOf<String, String>()
-            val newIdMap = mutableMapOf<String, String>()
-
-            for (index in 0 until array.length()) {
-                val entry = array.optJSONObject(index) ?: continue
-
-                val alias = entry.optString("alias").takeIf { it.isNotBlank() } ?: continue
-                val id = entry.optString("instanceId").trim().ifEmpty { alias }
-
-                ids += id
-                newAliasMap[alias] = id
-                newIdMap[id] = alias
-
-                ensureCharoPlaceholder(id, alias)
-
-                val previousId = charoAliasToId[alias]
-                if (previousId != null && previousId != id) {
-                    renameCharoHost(previousId, id, alias)
-                }
-            }
-
-            charoAliasToId.clear()
-            charoAliasToId.putAll(newAliasMap)
-            charoIdToAlias.clear()
-            charoIdToAlias.putAll(newIdMap)
-            charoWhitelist = ids
-            pruneCharoHostsByWhitelist()
-            broadcastCharoState()
-        } catch (e: Exception) {
-            Log.w("MQTTService", "Error parsing charo whitelist: ${e.message}")
-        }
-    }
-
     private fun handleBackendStatus(payload: String) {
         try {
             val json = JSONObject(payload)
@@ -582,173 +541,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         }
     }
 
-    private fun ensureCharoPlaceholder(instanceId: String, alias: String) {
-        val entry = charoHosts.getOrPut(instanceId) { CharoHostState(topicId = instanceId) }
-        entry.topicId = instanceId
-        entry.instanceId = instanceId
-        entry.alias = alias
-        if (entry.status == STATUS_UNKNOWN) {
-            entry.status = STATUS_OFFLINE
-        }
-    }
-
-    private fun renameCharoHost(oldId: String, newId: String, alias: String) {
-        if (oldId == newId) return
-        val entry = charoHosts.remove(oldId) ?: return
-        entry.topicId = newId
-        entry.instanceId = newId
-        entry.alias = alias
-        charoHosts[newId] = entry
-    }
-
-    private fun updateCharoMetrics(topic: String, payload: String) {
-        try {
-            val metricsJson = JSONObject(payload)
-            val topicId = extractCharoTopicId(topic)
-                ?: metricsJson.optString("instanceId").takeIf { it.isNotBlank() }
-                ?: return
-            val payloadInstanceId = metricsJson.optString("instanceId").takeIf { it.isNotBlank() }
-            val entry = resolveCharoHost(topicId, payloadInstanceId)
-            if (!isCharoAllowed(entry.instanceId)) {
-                removeCharoHost(entry)
-                return
-            }
-            val nowMs = System.currentTimeMillis()
-            markCharoHeartbeat(entry, nowMs)
-            entry.lastMetricsSeenMs = nowMs
-            if (entry.status != STATUS_ONLINE) {
-                entry.status = STATUS_ONLINE
-            }
-            entry.metrics = metricsJson
-            val timeoutSeconds = metricsJson.optLong("timeoutSeconds", 0L)
-            if (timeoutSeconds > 0) {
-                entry.timeoutMs = timeoutSeconds * 1000L
-            }
-            broadcastCharoState()
-        } catch (ex: Exception) {
-            val detail = ex.message ?: topic
-            sendError(getString(R.string.error_parse_charo_metrics, detail))
-        }
-    }
-
-    private fun updateCharoStatus(topic: String) {
-        val topicId = extractCharoTopicId(topic) ?: return
-        val entry = resolveCharoHost(topicId, null)
-        if (!isCharoAllowed(entry.instanceId)) {
-            removeCharoHost(entry)
-            return
-        }
-        val nowMs = System.currentTimeMillis()
-        markCharoHeartbeat(entry, nowMs)
-        // La presencia del heartbeat en el topico /status indica host vivo.
-        // El estado offline se determina por timeout sin actividad.
-        entry.status = STATUS_ONLINE
-        broadcastCharoState()
-    }
-
-    private fun extractCharoTopicId(topic: String): String? {
-        val parts = topic.split("/")
-        return if (parts.size >= 3) parts[2] else null
-    }
-
-    private fun markCharoHeartbeat(entry: CharoHostState, nowMs: Long = System.currentTimeMillis()) {
-        entry.lastSeenMs = nowMs
-    }
-
-    private fun resolveCharoHost(topicId: String, payloadInstanceId: String?): CharoHostState {
-        val normalizedTopicId = topicId.trim()
-        val normalizedPayloadId = payloadInstanceId?.trim().orEmpty()
-        val mappedId = charoAliasToId[normalizedTopicId].orEmpty()
-        val resolvedId = when {
-            normalizedPayloadId.isNotBlank() -> normalizedPayloadId
-            mappedId.isNotBlank() -> mappedId
-            else -> normalizedTopicId
-        }
-        val resolvedAlias = charoIdToAlias[resolvedId].orEmpty().ifBlank { normalizedTopicId }
-
-        val existingByResolved = charoHosts[resolvedId]
-        val existingByTopic = if (resolvedId != normalizedTopicId) charoHosts.remove(normalizedTopicId) else null
-        val entry = existingByResolved ?: existingByTopic ?: CharoHostState(topicId = normalizedTopicId)
-        entry.topicId = normalizedTopicId
-        entry.instanceId = resolvedId
-        entry.alias = resolvedAlias
-        charoHosts[resolvedId] = entry
-        return entry
-    }
-
-    private fun removeCharoHost(entry: CharoHostState) {
-        charoHosts.remove(entry.instanceId)
-        if (entry.topicId.isNotBlank() && entry.topicId != entry.instanceId) {
-            charoHosts.remove(entry.topicId)
-        }
-    }
-
-    private fun isCharoAllowed(instanceId: String?): Boolean {
-        val whitelist = charoWhitelist
-        if (whitelist.isEmpty()) return true
-        val id = instanceId?.takeIf { it.isNotBlank() } ?: return true
-        return whitelist.contains(id)
-    }
-
-    private fun pruneCharoHostsByWhitelist() {
-        val whitelist = charoWhitelist
-        if (whitelist.isEmpty()) return
-        var changed = false
-        val iterator = charoHosts.entries.iterator()
-        while (iterator.hasNext()) {
-            val entry = iterator.next()
-            val instanceId = entry.value.instanceId
-            if (instanceId.isBlank()) {
-                continue
-            }
-            if (!whitelist.contains(instanceId)) {
-                iterator.remove()
-                changed = true
-            }
-        }
-        if (changed) {
-            broadcastCharoState()
-        }
-    }
-
-    private fun broadcastCharoState() {
-        val itemsArray = JSONArray()
-        val sorted = charoHosts.values.sortedBy { it.instanceId.lowercase(Locale.getDefault()) }
-        for (entry in sorted) {
-            val payload = entry.metrics?.let { JSONObject(it.toString()) } ?: JSONObject()
-            if (!payload.has("instanceId") || payload.optString("instanceId").isBlank()) {
-                payload.put("instanceId", entry.instanceId)
-            }
-            payload.put("status", entry.status)
-            if (!payload.has("timeoutSeconds")) {
-                payload.put("timeoutSeconds", entry.timeoutMs / 1000L)
-            }
-            payload.put("topicId", entry.topicId)
-            payload.put("alias", entry.alias)
-            itemsArray.put(payload)
-        }
-        val wrapper = JSONObject().put("items", itemsArray)
-        val snapshot = wrapper.toString()
-        lastCharoSnapshot = snapshot
-        enviarCharitoEstado(snapshot)
-    }
-
-    private fun enforceCharoTimeout() {
-        val now = System.currentTimeMillis()
-        var changed = false
-        for (entry in charoHosts.values) {
-            val elapsed = now - entry.lastSeenMs
-            val threshold = (entry.timeoutMs.takeIf { it > 0 } ?: CHARO_TIMEOUT_MS) * 2
-            if (elapsed > threshold && entry.status != STATUS_OFFLINE) {
-                entry.status = STATUS_OFFLINE
-                changed = true
-            }
-        }
-        if (changed) {
-            broadcastCharoState()
-        }
-    }
-
     private fun coalesceUi() {
         if (coalesceJob?.isActive == true) return
         coalesceJob = scope.launch {
@@ -761,12 +553,7 @@ class MQTTService : Service(), MqttCallbackExtended {
     private fun parseModemEstado(raw: String): ModemEstado {
         val valor = try {
             val parsed = JSONObject(raw)
-            if (parsed.optString("type").equals("rpc", ignoreCase = true)) {
-                val data = parsed.optJSONObject("data")
-                data?.let { extractEstado(it, raw) } ?: raw
-            } else {
-                extractEstado(parsed, raw)
-            }
+            extractEstado(parsed, raw)
         } catch (_: Exception) {
             raw
         }
@@ -792,17 +579,19 @@ class MQTTService : Service(), MqttCallbackExtended {
     }
 
     private fun requestInitialState() {
-        sendRpcRequest("get_global_status", MqttConfig.TOPIC_GRADO)
-        sendRpcRequest("get_modem_status", MqttConfig.TOPIC_MODEM_CONEXION)
+        sendRpcRequest("get_global_status")
+        sendRpcRequest("get_modem_status")
     }
 
-    private fun sendRpcRequest(action: String, replyTo: String, params: JSONObject? = null) {
+    private fun sendRpcRequest(action: String, params: JSONObject? = null) {
+        val corr = UUID.randomUUID().toString()
+        val replyTo = MqttConfig.rpcResponseTopic(clientId, corr)
         val payload = JSONObject().apply {
             put("reply_to", replyTo)
-            put("corr", UUID.randomUUID().toString())
+            put("corr", corr)
             put("params", params ?: JSONObject())
         }.toString()
-        publish("${MqttConfig.RPC_ROOT}/$action", payload, qos = 1, retained = false)
+        publish("${MqttConfig.RPC_REQ_ROOT}/$action", payload, qos = 1, retained = false)
     }
 
     private fun publish(topic: String, message: String, qos: Int, retained: Boolean) {
