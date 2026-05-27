@@ -157,8 +157,8 @@ class CheatSheetAdapter(
             val context = itemView.context
             titleView.text = item.title
             val (textRes, colorRes) = when (item.estado) {
-                GeEstado.MARCHA -> R.string.cheat_sheet_ge_running to R.color.ge_led_marcha
-                GeEstado.PARADO -> R.string.cheat_sheet_ge_stopped to R.color.ge_led_parado
+                GeEstado.LINEA_ABIERTA -> R.string.cheat_sheet_ge_line_open to R.color.ge_led_line_open
+                GeEstado.LINEA_CERRADA -> R.string.cheat_sheet_ge_line_closed to R.color.ge_led_line_closed
                 GeEstado.DESCONOCIDO -> R.string.cheat_sheet_ge_unknown to R.color.ge_led_unknown
             }
             statusView.text = context.getString(textRes)

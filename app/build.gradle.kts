@@ -13,6 +13,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -31,7 +33,7 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-    packagingOptions {
+    packaging {
         jniLibs {
             useLegacyPackaging = true
         }
@@ -39,7 +41,6 @@ android {
 }
 
 dependencies {
-
     implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
     implementation("org.eclipse.paho:org.eclipse.paho.android.service:1.1.1")
 
@@ -51,4 +52,18 @@ dependencies {
 
     // DataStore Preferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+}
+
+// Registro de tarea para compatibilidad con herramientas que esperan 'testClasses'
+tasks.register("testClasses") {
+    description = "Alias para tareas de compilación de tests unitarios"
+    group = "verification"
+    dependsOn(tasks.matching {
+        it.name.startsWith("compile") && it.name.endsWith("UnitTestSources")
+    })
 }

@@ -34,7 +34,7 @@ object MqttConfig {
         "$BASE/email/event" // payload JSON: {"type":"email","subject":"...","ok":true,"ts":"..."}
     const val TOPIC_SERVICE_STATUS = "panelexemys/status" // payload JSON: {"status":"online|offline","ts":"...","reason":"..."}
     const val TOPIC_GE_EMAR =
-        "$BASE/modbus/ge/status" // payload JSON: {"estado":"marcha|parado|desconocido","ts":"..."}
+        "$BASE/modbus/ge/status" // payload JSON: {"interruptor_linea":{"estado":"abierto|cerrado","bit":0|1},"ts":"..."}
 
     // Estado consolidado de charo-daemon publicado por charito-service.
     // Panelito no consume topicos directos de charo-daemon.

@@ -313,9 +313,14 @@ class MQTTService : Service(), MqttCallbackExtended {
                 handleCharitoState(payload)
             }
             MqttConfig.TOPIC_GE_EMAR -> {
-                val estado = parseGeEstado(payload)
-                lastGeEstado = estado
-                enviarGeEstado(estado)
+                try {
+                    val estado = parseGeEstado(payload)
+                    lastGeEstado = estado
+                    enviarGeEstado(estado)
+                } catch (e: Exception) {
+                    val detail = e.message ?: getString(R.string.status_unknown)
+                    sendError(getString(R.string.error_parse_ge_status, detail))
+                }
             }
         }
     }
@@ -475,6 +480,11 @@ class MQTTService : Service(), MqttCallbackExtended {
                     lastModemEstado = ModemEstado.fromString(data.optString("estado", "desconocido"))
                     enviarModemEstado(lastModemEstado)
                 }
+                "get_ge_status" -> {
+                    val estado = parseGeEstado(data)
+                    lastGeEstado = estado
+                    enviarGeEstado(estado)
+                }
                 "send_email_test" -> Unit
                 else -> sendError(getString(R.string.error_rpc_unknown_action, action))
             }
@@ -569,18 +579,27 @@ class MQTTService : Service(), MqttCallbackExtended {
     }
 
     private fun parseGeEstado(raw: String): GeEstado {
-        val valor = try {
-            val parsed = JSONObject(raw)
-            parsed.optString("estado", raw)
-        } catch (_: Exception) {
-            raw
+        return parseGeEstado(JSONObject(raw))
+    }
+
+    private fun parseGeEstado(parsed: JSONObject): GeEstado {
+        val interruptorLinea = parsed.getJSONObject("interruptor_linea")
+        val estado = interruptorLinea.getString("estado")
+        val bit = interruptorLinea.getInt("bit")
+        if (bit != 0 && bit != 1) {
+            throw IllegalArgumentException("interruptor_linea.bit debe ser 0 o 1")
         }
-        return GeEstado.fromString(valor)
+        val esperado = if (bit == 1) "cerrado" else "abierto"
+        if (!estado.equals(esperado, ignoreCase = true)) {
+            throw IllegalArgumentException("interruptor_linea.estado no coincide con bit")
+        }
+        return GeEstado.fromLineState(estado, bit)
     }
 
     private fun requestInitialState() {
         sendRpcRequest("get_global_status")
         sendRpcRequest("get_modem_status")
+        sendRpcRequest("get_ge_status")
     }
 
     private fun sendRpcRequest(action: String, params: JSONObject? = null) {

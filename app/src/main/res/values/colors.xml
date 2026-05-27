@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ge_led_marcha">#2ecc71</color>
-    <color name="ge_led_parado">#1e88e5</color>
+    <color name="ge_led_line_open">#2ecc71</color>
+    <color name="ge_led_line_closed">#1e88e5</color>
     <color name="ge_led_unknown">#b0bec5</color>
     <color name="telefono_screen_bg">#F3F6F9</color>
     <color name="telefono_card_bg">#FFFFFF</color>
