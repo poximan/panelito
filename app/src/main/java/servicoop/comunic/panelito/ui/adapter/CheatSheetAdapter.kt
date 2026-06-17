@@ -34,6 +34,7 @@ sealed class CheatSheetEntry {
 
     data class GeStatus(
         val id: Int,
+        val edificio: String,
         val title: String,
         val estado: GeEstado
     ) : CheatSheetEntry()

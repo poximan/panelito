@@ -79,8 +79,11 @@ class MQTTService : Service(), MqttCallbackExtended {
         const val ACTION_BACKEND_STATUS = "$ACTION_PREFIX.ACTION_BACKEND_STATUS"
         const val EXTRA_BACKEND_STATUS = "EXTRA_BACKEND_STATUS"
         const val EXTRA_BACKEND_STATUS_TS = "EXTRA_BACKEND_STATUS_TS"
-        const val ACTION_GE_EMAR_ESTADO = "$ACTION_PREFIX.ACTION_GE_EMAR_ESTADO"
-        const val EXTRA_GE_EMAR_ESTADO = "EXTRA_GE_EMAR_ESTADO"
+        const val ACTION_GE_ESTADO = "$ACTION_PREFIX.ACTION_GE_ESTADO"
+        const val EXTRA_GE_EDIFICIO = "EXTRA_GE_EDIFICIO"
+        const val EXTRA_GE_ESTADO = "EXTRA_GE_ESTADO"
+        const val GE_EDIF_ESTIVARIZ = "edif-estivariz"
+        const val GE_EDIF_FONTANA = "edif-fontana"
 
         // Pedido de estado desde UI
         const val EXTRA_SOLICITAR_ESTADO = "solicitar_estado"
@@ -119,7 +122,10 @@ class MQTTService : Service(), MqttCallbackExtended {
     private var lastEmailEstado: String? = null
     private var lastProxmoxEstado: String? = null
     private var lastCharoSnapshot: String? = null
-    private var lastGeEstado: GeEstado = GeEstado.DESCONOCIDO
+    private val lastGeEstados = mutableMapOf(
+        GE_EDIF_ESTIVARIZ to GeEstado.DESCONOCIDO,
+        GE_EDIF_FONTANA to GeEstado.DESCONOCIDO
+    )
     private var lastModemEstado: ModemEstado = ModemEstado.DESCONOCIDO
     private var backendOnline: Boolean = true
     private var lastBrokerEstado: BrokerEstado = BrokerEstado.DESCONECTADO
@@ -246,7 +252,8 @@ class MQTTService : Service(), MqttCallbackExtended {
             mqttClient.subscribe(MqttConfig.TOPIC_EMAIL_EVENT, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_SERVICE_STATUS, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.TOPIC_CHARITO_STATE, MqttConfig.QOS_SUBS)
-            mqttClient.subscribe(MqttConfig.TOPIC_GE_EMAR, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.TOPIC_GE_ESTIVARIZ, MqttConfig.QOS_SUBS)
+            mqttClient.subscribe(MqttConfig.TOPIC_GE_FONTANA, MqttConfig.QOS_SUBS)
             mqttClient.subscribe(MqttConfig.rpcResponseSubscription(clientId), MqttConfig.QOS_SUBS)
         } catch (e: Exception) {
             val detail = e.message ?: getString(R.string.status_unknown)
@@ -312,15 +319,9 @@ class MQTTService : Service(), MqttCallbackExtended {
             MqttConfig.TOPIC_CHARITO_STATE -> {
                 handleCharitoState(payload)
             }
-            MqttConfig.TOPIC_GE_EMAR -> {
-                try {
-                    val estado = parseGeEstado(payload)
-                    lastGeEstado = estado
-                    enviarGeEstado(estado)
-                } catch (e: Exception) {
-                    val detail = e.message ?: getString(R.string.status_unknown)
-                    sendError(getString(R.string.error_parse_ge_status, detail))
-                }
+            MqttConfig.TOPIC_GE_ESTIVARIZ,
+            MqttConfig.TOPIC_GE_FONTANA -> {
+                handleGeStatus(topic, payload)
             }
         }
     }
@@ -423,8 +424,11 @@ class MQTTService : Service(), MqttCallbackExtended {
         LocalBroadcastManager.getInstance(this).sendBroadcast(i)
     }
 
-    private fun enviarGeEstado(estado: GeEstado) {
-        val intent = Intent(ACTION_GE_EMAR_ESTADO).apply { putExtra(EXTRA_GE_EMAR_ESTADO, estado.name) }
+    private fun enviarGeEstado(edificio: String, estado: GeEstado) {
+        val intent = Intent(ACTION_GE_ESTADO).apply {
+            putExtra(EXTRA_GE_EDIFICIO, edificio)
+            putExtra(EXTRA_GE_ESTADO, estado.name)
+        }
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 
@@ -482,8 +486,8 @@ class MQTTService : Service(), MqttCallbackExtended {
                 }
                 "get_ge_status" -> {
                     val estado = parseGeEstado(data)
-                    lastGeEstado = estado
-                    enviarGeEstado(estado)
+                    lastGeEstados[GE_EDIF_ESTIVARIZ] = estado
+                    enviarGeEstado(GE_EDIF_ESTIVARIZ, estado)
                 }
                 "send_email_test" -> Unit
                 else -> sendError(getString(R.string.error_rpc_unknown_action, action))
@@ -544,6 +548,8 @@ class MQTTService : Service(), MqttCallbackExtended {
                 lastEmailEstado = null
                 lastProxmoxEstado = null
                 lastModemEstado = ModemEstado.DESCONOCIDO
+                lastGeEstados[GE_EDIF_ESTIVARIZ] = GeEstado.DESCONOCIDO
+                lastGeEstados[GE_EDIF_FONTANA] = GeEstado.DESCONOCIDO
             }
         } catch (ex: Exception) {
             val detail = ex.message ?: getString(R.string.status_unknown)
@@ -580,6 +586,28 @@ class MQTTService : Service(), MqttCallbackExtended {
 
     private fun parseGeEstado(raw: String): GeEstado {
         return parseGeEstado(JSONObject(raw))
+    }
+
+    private fun handleGeStatus(topic: String, payload: String) {
+        try {
+            val parsed = JSONObject(payload)
+            val edificio = parsed.optString("edificio", edificioFromTopic(topic)).ifBlank {
+                edificioFromTopic(topic)
+            }
+            val estado = parseGeEstado(parsed)
+            lastGeEstados[edificio] = estado
+            enviarGeEstado(edificio, estado)
+        } catch (e: Exception) {
+            val detail = e.message ?: getString(R.string.status_unknown)
+            sendError(getString(R.string.error_parse_ge_status, detail))
+        }
+    }
+
+    private fun edificioFromTopic(topic: String): String {
+        return when (topic) {
+            MqttConfig.TOPIC_GE_FONTANA -> GE_EDIF_FONTANA
+            else -> GE_EDIF_ESTIVARIZ
+        }
     }
 
     private fun parseGeEstado(parsed: JSONObject): GeEstado {
@@ -640,6 +668,6 @@ class MQTTService : Service(), MqttCallbackExtended {
         lastProxmoxEstado?.let { enviarProxmoxEstado(it) }
         lastCharoSnapshot?.let { enviarCharitoEstado(it) }
         enviarBrokerEstado(if (isConnected) BrokerEstado.CONECTADO else BrokerEstado.DESCONECTADO)
-        enviarGeEstado(lastGeEstado)
+        lastGeEstados.forEach { (edificio, estado) -> enviarGeEstado(edificio, estado) }
     }
 }

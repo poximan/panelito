@@ -17,7 +17,8 @@ Topicos consumidos principales:
 - `lechuza-server/router/status`
 - `lechuza-server/modbus/grd/summary`
 - `lechuza-server/modbus/grd/disconnected`
-- `lechuza-server/modbus/ge/status`
+- `lechuza-server/modbus/ge/edif-estivariz/status`
+- `lechuza-server/modbus/ge/edif-fontana/status`
 - `lechuza-server/email/status`
 - `lechuza-server/email/event`
 - `lechuza-server/pve/status`

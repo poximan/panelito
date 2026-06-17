@@ -43,10 +43,12 @@ class CheatSheetFragment : Fragment() {
     private val mqttReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                MQTTService.ACTION_GE_EMAR_ESTADO -> {
-                    val raw = intent.getStringExtra(MQTTService.EXTRA_GE_EMAR_ESTADO) ?: return
+                MQTTService.ACTION_GE_ESTADO -> {
+                    val edificio = intent.getStringExtra(MQTTService.EXTRA_GE_EDIFICIO)
+                        ?: MQTTService.GE_EDIF_ESTIVARIZ
+                    val raw = intent.getStringExtra(MQTTService.EXTRA_GE_ESTADO) ?: return
                     val estado = runCatching { GeEstado.valueOf(raw) }.getOrElse { GeEstado.DESCONOCIDO }
-                    updateGeStatus(estado)
+                    updateGeStatus(edificio, estado)
                 }
             }
         }
@@ -72,7 +74,7 @@ class CheatSheetFragment : Fragment() {
         super.onStart()
         LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
             mqttReceiver,
-            IntentFilter(MQTTService.ACTION_GE_EMAR_ESTADO)
+            IntentFilter(MQTTService.ACTION_GE_ESTADO)
         )
     }
 
@@ -129,7 +131,16 @@ class CheatSheetFragment : Fragment() {
         items.add(
             CheatSheetEntry.GeStatus(
                 id = 5,
-                title = getString(R.string.cheat_sheet_ge_title),
+                edificio = MQTTService.GE_EDIF_ESTIVARIZ,
+                title = getString(R.string.cheat_sheet_ge_estivariz_title),
+                estado = GeEstado.DESCONOCIDO
+            )
+        )
+        items.add(
+            CheatSheetEntry.GeStatus(
+                id = 6,
+                edificio = MQTTService.GE_EDIF_FONTANA,
+                title = getString(R.string.cheat_sheet_ge_fontana_title),
                 estado = GeEstado.DESCONOCIDO
             )
         )
@@ -220,8 +231,10 @@ class CheatSheetFragment : Fragment() {
         }
     }
 
-    private fun updateGeStatus(estado: GeEstado) {
-        val index = items.indexOfFirst { it is CheatSheetEntry.GeStatus }
+    private fun updateGeStatus(edificio: String, estado: GeEstado) {
+        val index = items.indexOfFirst {
+            it is CheatSheetEntry.GeStatus && it.edificio == edificio
+        }
         if (index >= 0) {
             val current = items[index] as CheatSheetEntry.GeStatus
             if (current.estado != estado) {
