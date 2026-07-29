@@ -23,7 +23,7 @@ import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.EmailEvent
-import servicoop.comunic.panelito.core.util.TimestampFormatter
+import servicoop.comunic.panelito.core.time.AppTime
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.MainActivity
 import servicoop.comunic.panelito.ui.adapter.EmailEventsAdapter
@@ -213,7 +213,7 @@ class EmailEventsFragment : Fragment() {
             val pingLocal = root.optString("ping_local", defaultUnknown).trim().ifEmpty { defaultUnknown }
             val pingRemoto = root.optString("ping_remoto", defaultUnknown).trim().ifEmpty { defaultUnknown }
             val tsRaw = root.optString("ts", "")
-            val tsFormatted = TimestampFormatter.format(tsRaw, "")
+            val tsFormatted = AppTime.formatForPresentation(tsRaw, "")
 
             txtSmtp.text = getString(R.string.email_smtp_format, formatearEstado(smtp))
             txtPingLocal.text = getString(R.string.email_ping_local_format, formatearEstado(pingLocal))

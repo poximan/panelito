@@ -21,7 +21,7 @@ import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.ProxmoxState
 import servicoop.comunic.panelito.core.model.ProxmoxVm
-import servicoop.comunic.panelito.core.util.TimestampFormatter
+import servicoop.comunic.panelito.core.time.AppTime
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.adapter.ProxmoxVmAdapter
 
@@ -239,7 +239,7 @@ class ProxmoxFragment : Fragment() {
             nodeText.isVisible = false
         }
 
-        val normalizedTs = TimestampFormatter.format(state.timestamp, "")
+        val normalizedTs = AppTime.formatForPresentation(state.timestamp, "")
         if (normalizedTs.isNotBlank()) {
             updatedText.isVisible = true
             updatedText.text = getString(R.string.proxmox_updated_at, normalizedTs)

@@ -21,7 +21,7 @@ import androidx.recyclerview.widget.RecyclerView
 import org.json.JSONArray
 import org.json.JSONObject
 import servicoop.comunic.panelito.R
-import servicoop.comunic.panelito.core.util.TimestampFormatter
+import servicoop.comunic.panelito.core.time.AppTime
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.MainActivity
 import java.util.Locale
@@ -338,7 +338,10 @@ class CharitoVH(view: View, private val onToggle: (String) -> Unit) : RecyclerVi
         }
         status.text = ctx.getString(R.string.charo_status_label_prefix, statusText)
 
-        val formattedTs = TimestampFormatter.format(item.receivedAt, ctx.getString(R.string.charo_time_unknown))
+        val formattedTs = AppTime.formatForPresentation(
+            item.receivedAt,
+            ctx.getString(R.string.charo_time_unknown),
+        )
         updated.text = ctx.getString(R.string.charo_tile_updated_at, formattedTs)
         val samplesText = ctx.resources.getQuantityString(
             R.plurals.charo_row_samples,
