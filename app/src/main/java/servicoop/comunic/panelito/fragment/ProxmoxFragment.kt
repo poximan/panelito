@@ -15,12 +15,10 @@ import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import org.json.JSONArray
-import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.ProxmoxState
-import servicoop.comunic.panelito.core.model.ProxmoxVm
+import servicoop.comunic.panelito.core.model.ProxmoxStateParser
 import servicoop.comunic.panelito.core.time.AppTime
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.adapter.ProxmoxVmAdapter
@@ -146,80 +144,10 @@ class ProxmoxFragment : Fragment() {
 
     private fun parseAndRender(raw: String) {
         try {
-            val obj = JSONObject(raw)
-            val state = mapState(obj)
-            render(state)
+            render(ProxmoxStateParser.parse(raw))
         } catch (e: Exception) {
             Log.e("ProxmoxFragment", "Error parseando estado Proxmox: ${e.message}", e)
         }
-    }
-
-    private fun mapState(obj: JSONObject): ProxmoxState {
-        val status = obj.optString("status", "offline")
-        val ts = obj.optString("ts", "")
-        val node = obj.optString("node", "")
-        val rawError = obj.optString("error", "")
-        val error = rawError.takeIf { it.isNotBlank() }
-
-        val missingRaw = obj.optJSONArray("missing") ?: JSONArray()
-        val missing = mutableListOf<Int>()
-        for (i in 0 until missingRaw.length()) {
-            missing.add(missingRaw.optInt(i))
-        }
-
-        val vmsArray = obj.optJSONArray("vms") ?: JSONArray()
-        val vms = mutableListOf<ProxmoxVm>()
-        for (i in 0 until vmsArray.length()) {
-            val vmObj = vmsArray.optJSONObject(i) ?: continue
-            val vmid = vmObj.optInt("vmid")
-            val name = vmObj.optString("name", "VM $vmid")
-            val statusRaw = vmObj.optString("status", "desconocido")
-            val statusDisplay = vmObj.optString("status_display", statusRaw.uppercase())
-            val cpus = vmObj.optInt("cpus")
-            val cpuPct = vmObj.optDouble("cpu_pct", 0.0)
-            val memUsed = vmObj.optDouble("mem_used_gb", 0.0)
-            val memTotal = vmObj.optDouble("mem_total_gb", 0.0)
-            val diskUsed = vmObj.optDouble("disk_used_gb", 0.0)
-            val diskTotal = vmObj.optDouble("disk_total_gb", 0.0)
-            val diskPct = vmObj.optDouble("disk_pct", Double.NaN).takeUnless { it.isNaN() }
-            val diskReadBytes = vmObj.optDouble("disk_read_bytes", 0.0)
-            val diskWriteBytes = vmObj.optDouble("disk_write_bytes", 0.0)
-            val diskReadRate = vmObj.optDouble("disk_read_rate_bps", 0.0)
-            val diskWriteRate = vmObj.optDouble("disk_write_rate_bps", 0.0)
-            val memPct = vmObj.optDouble("mem_pct", Double.NaN).takeUnless { it.isNaN() }
-            val uptime = vmObj.optString("uptime_human", "0m")
-
-            vms.add(
-                ProxmoxVm(
-                    vmid = vmid,
-                    name = name,
-                    status = statusRaw,
-                    statusDisplay = statusDisplay,
-                    cpus = cpus,
-                    cpuPct = cpuPct,
-                    memUsedGb = memUsed,
-                    memTotalGb = memTotal,
-                    memPct = memPct,
-                    diskUsedGb = diskUsed,
-                    diskTotalGb = diskTotal,
-                    diskPct = diskPct,
-                    diskReadBytes = diskReadBytes,
-                    diskWriteBytes = diskWriteBytes,
-                    diskReadRateBps = diskReadRate,
-                    diskWriteRateBps = diskWriteRate,
-                    uptime = uptime
-                )
-            )
-        }
-
-        return ProxmoxState(
-            status = status,
-            timestamp = ts,
-            node = node,
-            error = error,
-            missing = missing,
-            vms = vms
-        )
     }
 
     private fun render(state: ProxmoxState) {

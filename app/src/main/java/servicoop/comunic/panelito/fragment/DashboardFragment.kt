@@ -15,10 +15,9 @@ import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
-import servicoop.comunic.panelito.core.model.GrdDesconectado
+import servicoop.comunic.panelito.core.model.DashboardGrdParser
 import servicoop.comunic.panelito.core.util.Thresholds
 import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.services.mqtt.MQTTService
@@ -178,17 +177,9 @@ class DashboardFragment : Fragment() {
 
     private fun actualizarGrds(json: String) {
         try {
-            val root = JSONObject(json)
-            val arr = root.optJSONArray("items") ?: return
-            val out = ArrayList<GrdDesconectado>(arr.length())
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                val id = o.optInt("id")
-                val nombre = o.optString("nombre", getString(R.string.value_not_available))
-                val uc = o.optString("ultima_caida", "")
-                out.add(GrdDesconectado(id, nombre, uc))
-            }
-            grdsAdapter.submit(out)
+            grdsAdapter.submit(
+                DashboardGrdParser.parse(json, getString(R.string.value_not_available))
+            )
         } catch (e: Exception) {
             Log.e("DashboardFragment", "Error parseando GRDs: ${e.message}", e)
         }

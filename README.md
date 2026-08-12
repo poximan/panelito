@@ -45,18 +45,19 @@ Acciones RPC vigentes:
 
 ## Estructura
 
-- `app/src/main/java/servicoop/comunic/panelito/data/mqtt`: constantes y configuracion MQTT.
-- `app/src/main/java/servicoop/comunic/panelito/services/mqtt`: servicio de conexion, suscripcion, publicacion y difusion interna.
-- `app/src/main/java/servicoop/comunic/panelito/fragment`: pantallas operativas.
-- `app/src/main/res`: textos, layouts y recursos Android.
+| Pestaña | Presentación | Contrato/negocio | Adaptador |
+|---|---|---|---|
+| Dashboard | `DashboardFragment.kt` | `DashboardGrdParser.kt`, modelos de conectividad | `DisconnectedGrdAdapter.kt` |
+| Proxmox | `ProxmoxFragment.kt` | `ProxmoxStateParser.kt`, `ProxmoxState.kt`, `ProxmoxVm.kt` | `ProxmoxVmAdapter.kt` |
+| Charito | `CharitoFragment.kt` | `CharitoStateParser.kt`, `CharitoState.kt` | `CharitoInstanceAdapter.kt` |
+| Eventos de email | `EmailEventsFragment.kt` | `EmailServiceState.kt`, `EmailEvent.kt` | `EmailEventsAdapter.kt` |
+| Teléfonos | `TelefonosFragment.kt` | recursos versionados de teléfonos | `TelefonosAdapter.kt` |
+| Ayuda | `CheatSheetFragment.kt` | catálogo local de accesos y estados | `CheatSheetAdapter.kt` |
+
+`MainActivity` compone y navega. `MQTTService` y `data/mqtt` son compartidos porque administran una sola conexión al broker. No hay DAO por pestaña: Panelito consume proyecciones MQTT y no persiste datos operativos.
 
 ## Configuracion y secretos
 
 La configuracion operativa debe mantenerse fuera de git cuando contenga credenciales, hosts reales o endpoints sensibles. Los valores versionados deben ser plantillas o ejemplos sin secreto real.
 
-## Criterios Android
-
-- Centralizar textos visibles en recursos.
-- Mantener la logica de dominio fuera de fragments/adapters cuando corresponda.
-- Tratar errores de contrato como fallas visibles, no como datos inventados.
-- Usar reconexion MQTT como resiliencia tecnica, sin transformarla en fuente alternativa de verdad.
+La metodología general está en `../../../metodologia.txt`.

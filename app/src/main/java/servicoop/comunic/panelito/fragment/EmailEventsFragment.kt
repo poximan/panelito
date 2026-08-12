@@ -19,10 +19,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.EmailEvent
+import servicoop.comunic.panelito.core.model.EmailServiceHealth
+import servicoop.comunic.panelito.core.model.EmailServiceStateParser
 import servicoop.comunic.panelito.core.time.AppTime
 import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.MainActivity
@@ -207,30 +208,24 @@ class EmailEventsFragment : Fragment() {
 
     private fun actualizarEmailEstado(json: String) {
         try {
-            val root = JSONObject(json)
             val defaultUnknown = getString(R.string.status_unknown)
-            val smtp = root.optString("smtp", defaultUnknown).trim().ifEmpty { defaultUnknown }
-            val pingLocal = root.optString("ping_local", defaultUnknown).trim().ifEmpty { defaultUnknown }
-            val pingRemoto = root.optString("ping_remoto", defaultUnknown).trim().ifEmpty { defaultUnknown }
-            val tsRaw = root.optString("ts", "")
-            val tsFormatted = AppTime.formatForPresentation(tsRaw, "")
+            val state = EmailServiceStateParser.parse(json, defaultUnknown)
+            val tsFormatted = AppTime.formatForPresentation(state.timestamp, "")
 
-            txtSmtp.text = getString(R.string.email_smtp_format, formatearEstado(smtp))
-            txtPingLocal.text = getString(R.string.email_ping_local_format, formatearEstado(pingLocal))
-            txtPingRemote.text = getString(R.string.email_ping_remote_format, formatearEstado(pingRemoto))
+            txtSmtp.text = getString(R.string.email_smtp_format, formatearEstado(state.smtp))
+            txtPingLocal.text = getString(R.string.email_ping_local_format, formatearEstado(state.pingLocal))
+            txtPingRemote.text = getString(R.string.email_ping_remote_format, formatearEstado(state.pingRemote))
 
-            val estados = listOf(smtp, pingLocal, pingRemoto)
-            val normalized = estados.map { it.trim().lowercase(Locale.getDefault()) }
-            val resumen = when {
-                normalized.any { it == "desconectado" } -> {
+            val resumen = when (state.health) {
+                EmailServiceHealth.NO_SERVICE -> {
                     indicatorStatus.setBackgroundResource(R.drawable.led_rojo)
                     getString(R.string.email_summary_no_service)
                 }
-                normalized.any { it == "desconocido" } -> {
+                EmailServiceHealth.UNKNOWN -> {
                     indicatorStatus.setBackgroundResource(R.drawable.led_naranja)
                     getString(R.string.email_summary_unknown)
                 }
-                else -> {
+                EmailServiceHealth.OPERATIONAL -> {
                     indicatorStatus.setBackgroundResource(R.drawable.led_verde)
                     getString(R.string.email_summary_operational)
                 }
