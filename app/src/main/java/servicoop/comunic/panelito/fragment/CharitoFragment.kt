@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.launch
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.CharitoStateParser
@@ -37,7 +38,7 @@ class CharitoFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         adapter.resetExpandedState()
         viewLifecycleOwner.lifecycleScope.launch {
-            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 mqttSession.state.collect { state ->
                     state.charitoJson?.let(::parseAndRender) ?: showEmptyState()
                 }
