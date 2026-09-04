@@ -1,10 +1,7 @@
 package servicoop.comunic.panelito.fragment
 
 import android.content.ActivityNotFoundException
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -12,16 +9,18 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.GeEstado
-import servicoop.comunic.panelito.services.mqtt.MQTTService
+import servicoop.comunic.panelito.services.mqtt.MqttSession
 import servicoop.comunic.panelito.ui.adapter.CheatSheetAdapter
 import servicoop.comunic.panelito.ui.adapter.CheatSheetEntry
 import java.io.IOException
@@ -39,20 +38,8 @@ class CheatSheetFragment : Fragment() {
         CheatSheetAdapter(::openEndpointUrl, ::runPingForEndpoint, ::runTcpProbe)
     }
     private val items = mutableListOf<CheatSheetEntry>()
-
-    private val mqttReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                MQTTService.ACTION_GE_ESTADO -> {
-                    val edificio = intent.getStringExtra(MQTTService.EXTRA_GE_EDIFICIO)
-                        ?: MQTTService.GE_EDIF_ESTIVARIZ
-                    val raw = intent.getStringExtra(MQTTService.EXTRA_GE_ESTADO) ?: return
-                    val estado = runCatching { GeEstado.valueOf(raw) }.getOrElse { GeEstado.DESCONOCIDO }
-                    updateGeStatus(edificio, estado)
-                }
-            }
-        }
-    }
+    private val mqttSession
+        get() = (requireActivity().application as PanelitoApplication).mqttSession
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -68,24 +55,18 @@ class CheatSheetFragment : Fragment() {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = cheatSheetAdapter
         buildInitialItems()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
-            mqttReceiver,
-            IntentFilter(MQTTService.ACTION_GE_ESTADO)
-        )
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                mqttSession.state.collect { state ->
+                    state.geStates.forEach { (building, status) -> updateGeStatus(building, status) }
+                }
+            }
+        }
     }
 
     override fun onDestroyView() {
         recyclerView.adapter = null
         super.onDestroyView()
-    }
-
-    override fun onStop() {
-        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(mqttReceiver)
-        super.onStop()
     }
 
     private fun buildInitialItems() {
@@ -131,7 +112,7 @@ class CheatSheetFragment : Fragment() {
         items.add(
             CheatSheetEntry.GeStatus(
                 id = 5,
-                edificio = MQTTService.GE_EDIF_ESTIVARIZ,
+                edificio = MqttSession.GE_EDIF_ESTIVARIZ,
                 title = getString(R.string.cheat_sheet_ge_estivariz_title),
                 estado = GeEstado.DESCONOCIDO
             )
@@ -139,7 +120,7 @@ class CheatSheetFragment : Fragment() {
         items.add(
             CheatSheetEntry.GeStatus(
                 id = 6,
-                edificio = MQTTService.GE_EDIF_FONTANA,
+                edificio = MqttSession.GE_EDIF_FONTANA,
                 title = getString(R.string.cheat_sheet_ge_fontana_title),
                 estado = GeEstado.DESCONOCIDO
             )

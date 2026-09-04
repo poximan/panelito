@@ -1,2 +1,7 @@
 # Ruta de ejemplo del SDK Android. Ajustar segun la plataforma local.
 sdk.dir=C\:\\Android\\Sdk
+
+# Copiar a local.properties y completar durante el aprovisionamiento del dispositivo.
+panelito.mqtt.url=ssl://broker.example:8883
+panelito.mqtt.username=PANELITO_MQTT_USER
+panelito.mqtt.password=PANELITO_MQTT_PASSWORD

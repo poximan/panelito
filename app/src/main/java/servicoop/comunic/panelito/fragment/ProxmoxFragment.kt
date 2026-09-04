@@ -1,9 +1,5 @@
 package servicoop.comunic.panelito.fragment
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -12,15 +8,16 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import servicoop.comunic.panelito.R
-import servicoop.comunic.panelito.core.model.BrokerEstado
+import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.ProxmoxState
 import servicoop.comunic.panelito.core.model.ProxmoxStateParser
 import servicoop.comunic.panelito.core.time.AppTime
-import servicoop.comunic.panelito.services.mqtt.MQTTService
 import servicoop.comunic.panelito.ui.adapter.ProxmoxVmAdapter
 
 class ProxmoxFragment : Fragment() {
@@ -34,43 +31,11 @@ class ProxmoxFragment : Fragment() {
     private lateinit var emptyView: TextView
     private val adapter = ProxmoxVmAdapter()
 
-    private var lastPayload: String? = null
+    private val mqttSession
+        get() = (requireActivity().application as PanelitoApplication).mqttSession
 
     companion object {
-        private const val KEY_LAST_PAYLOAD = "last_payload"
         fun newInstance(): ProxmoxFragment = ProxmoxFragment()
-    }
-
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                MQTTService.ACTION_PROXMOX_ESTADO -> {
-                    val raw = intent.getStringExtra(MQTTService.EXTRA_PROXMOX_ESTADO) ?: return
-                    Log.d("ProxmoxFragment", "Estado recibido (${raw.length} chars)")
-                    lastPayload = raw
-                    parseAndRender(raw)
-                }
-                MQTTService.ACTION_BROKER_ESTADO -> {
-                    val estado = intent.getStringExtra(MQTTService.EXTRA_BROKER_ESTADO) ?: return
-                    if (!estado.equals(BrokerEstado.CONECTADO.name, ignoreCase = true)) {
-                        showOfflineState()
-                    }
-                }
-                MQTTService.ACTION_BACKEND_STATUS -> {
-                    val estado = intent.getStringExtra(MQTTService.EXTRA_BACKEND_STATUS) ?: return
-                    if (!estado.equals(MQTTService.STATUS_ONLINE, ignoreCase = true)) {
-                        showBackendUnknownState()
-                    } else {
-                        lastPayload?.let { parseAndRender(it) }
-                    }
-                }
-            }
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        lastPayload = savedInstanceState?.getString(KEY_LAST_PAYLOAD)
     }
 
     override fun onCreateView(
@@ -90,50 +55,23 @@ class ProxmoxFragment : Fragment() {
         recycler.layoutManager = LinearLayoutManager(requireContext())
         recycler.adapter = adapter
 
-        lastPayload?.let { parseAndRender(it) }
-
         return view
     }
 
-    override fun onStart() {
-        super.onStart()
-        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
-            receiver,
-            IntentFilter().apply {
-                addAction(MQTTService.ACTION_PROXMOX_ESTADO)
-                addAction(MQTTService.ACTION_BROKER_ESTADO)
-                addAction(MQTTService.ACTION_BACKEND_STATUS)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                mqttSession.state.collect { state ->
+                    state.proxmoxJson?.let(::parseAndRender) ?: showOfflineState()
+                }
             }
-        )
-        lastPayload?.let { parseAndRender(it) }
-    }
-
-    override fun onStop() {
-        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(receiver)
-        super.onStop()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        lastPayload?.let { outState.putString(KEY_LAST_PAYLOAD, it) }
+        }
     }
 
     private fun showOfflineState() {
-        lastPayload = null
         statusIndicator.setBackgroundResource(R.drawable.led_rojo)
         statusText.text = getString(R.string.proxmox_status_offline)
-        nodeText.isVisible = false
-        updatedText.isVisible = false
-        missingText.isVisible = false
-        adapter.submitList(emptyList())
-        recycler.isVisible = false
-        emptyView.isVisible = true
-    }
-
-    private fun showBackendUnknownState() {
-        lastPayload = null
-        statusIndicator.setBackgroundResource(R.drawable.led_naranja)
-        statusText.text = getString(R.string.proxmox_status_unknown)
         nodeText.isVisible = false
         updatedText.isVisible = false
         missingText.isVisible = false

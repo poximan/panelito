@@ -6,6 +6,6 @@ data class EmailEvent(
     val type: String,
     val subject: String,
     val ok: Boolean,
-    val timestamp: String
+    val timestamp: String,
+    val detail: String = "",
 ) : Serializable
-

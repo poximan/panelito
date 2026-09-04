@@ -1,7 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val panelitoLocalProperties = Properties().also { properties ->
+    val propertiesFile = rootProject.file("local.properties")
+    if (propertiesFile.isFile) {
+        propertiesFile.inputStream().use { properties.load(it) }
+    }
+}
+
+fun requiredPanelitoProperty(name: String): String =
+    panelitoLocalProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: error("Falta la propiedad obligatoria $name en local.properties")
+
+fun quoteBuildConfig(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "servicoop.comunic.panelito"
@@ -15,6 +31,25 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "PANELITO_MQTT_BROKER_URL",
+            quoteBuildConfig(requiredPanelitoProperty("panelito.mqtt.url")),
+        )
+        buildConfigField(
+            "String",
+            "PANELITO_MQTT_USERNAME",
+            quoteBuildConfig(requiredPanelitoProperty("panelito.mqtt.username")),
+        )
+        buildConfigField(
+            "String",
+            "PANELITO_MQTT_PASSWORD",
+            quoteBuildConfig(requiredPanelitoProperty("panelito.mqtt.password")),
+        )
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -42,8 +77,6 @@ android {
 
 dependencies {
     implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
-    implementation("org.eclipse.paho:org.eclipse.paho.android.service:1.1.1")
-
     implementation("androidx.core:core-ktx:1.9.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")

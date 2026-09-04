@@ -1,16 +1,18 @@
 ﻿<resources>
     <string name="app_name">Panelito</string>
+    <string name="splash_title">panelito</string>
+    <string name="splash_subtitle">cargando</string>
+    <string name="splash_image_desc">logo servicoop</string>
 
     <!-- UI labels -->
-    <string name="mqtt_broker_url" translatable="false">ssl://broker-ejemplo.fake.cloud:8883</string>
-    <string name="mqtt_broker_username" translatable="false">usuario_demo</string>
-    <string name="mqtt_broker_password" translatable="false">clave1234</string>
-    <string name="switch_connect_broker">Conectar broker</string>
+    <string name="mqtt_connection_label">Conexión MQTT</string>
     <string name="broker_status_placeholder">Broker: DESCONECTADO</string>
-    <string name="modem_status_placeholder">Modem: desconectado</string>
-    <string name="email_smtp_placeholder">SMTP en host LAN (smtp.ejemplo.org): --</string>
-    <string name="email_ping_local_placeholder">Ping IPPUB gw local (ejemplo.org): --</string>
-    <string name="email_ping_remote_placeholder">Ping IPPUB serv remoto (mail.ejemplo.org): --</string>
+    <string name="modem_status_placeholder">Modem: desconocido</string>
+    <string name="modem_state_open">abierto</string>
+    <string name="modem_state_closed">cerrado</string>
+    <string name="email_smtp_placeholder">SMTP en host LAN (post.servicoop.com): --</string>
+    <string name="email_ping_local_placeholder">Ping IPPUB gw local (servicoop.com.ar): --</string>
+    <string name="email_ping_remote_placeholder">Ping IPPUB serv remoto (mail.servicoop.com): --</string>
     <string name="grade_connectivity_title">Grado conectividad</string>
     <string name="grade_percentage_placeholder">0.0%</string>
     <string name="disconnected_list_title">Actualmente desconectados</string>
@@ -20,10 +22,6 @@
     <string name="item_grd_tdesc_label">T.desc: </string>
     <string name="item_grd_default_elapsed">0m</string>
 
-    <!-- Messages -->
-    <string name="permissions_denied_message">Algunos permisos importantes fueron denegados. La aplicacion podria no funcionar correctamente.</string>
-    <string name="permissions_granted_message">Todos los permisos necesarios concedidos.</string>
-
     <!-- Fragment labels -->
     <string name="broker_status">Broker: %1$s</string>
     <string name="modem_status">Modem: %1$s</string>
@@ -31,9 +29,9 @@
     <string name="email_summary_no_service">Email: sin servicio</string>
     <string name="email_summary_unknown">Email: indeterminado</string>
     <string name="email_summary_operational">Email: operativo</string>
-    <string name="email_smtp_format">SMTP en host LAN (smtp.ejemplo.org): %1$s</string>
-    <string name="email_ping_local_format">Ping IPPUB gw local (ejemplo.org): %1$s</string>
-    <string name="email_ping_remote_format">Ping IPPUB serv remoto (mail.ejemplo.org): %1$s</string>
+    <string name="email_smtp_format">SMTP en host LAN (post.servicoop.com): %1$s</string>
+    <string name="email_ping_local_format">Ping IPPUB gw local (servicoop.com.ar): %1$s</string>
+    <string name="email_ping_remote_format">Ping IPPUB serv remoto (mail.servicoop.com): %1$s</string>
     <string name="status_unknown">desconocido</string>
     <string name="status_disconnected_upper">DESCONECTADO</string>
     <string name="status_disconnected_capitalized">Desconectado</string>
@@ -47,14 +45,14 @@
     <string name="proxmox_missing">VM sin datos: %1$s</string>
     <string name="proxmox_empty">Sin datos disponibles</string>
     <string name="proxmox_vm_name_format">VM %1$d · %2$s</string>
-    <string name="proxmox_cpu_label">CPU: </string>
-    <string name="proxmox_memory_label">Memoria: </string>
+    <string name="proxmox_cpu_label">CPU:\u0020</string>
+    <string name="proxmox_memory_label">Memoria:\u0020</string>
     <string name="proxmox_cpu_value">%.1f %%</string>
     <string name="proxmox_memory_value">%1$.1f / %2$.1f GB (%3$.0f%%)</string>
     <string name="proxmox_disk_total">Disco asignado: %.1f GB</string>
     <string name="proxmox_disk_total_unknown">Disco asignado: N/D</string>
-    <string name="proxmox_disk_read_title">Lectura </string>
-    <string name="proxmox_disk_write_title">Escritura </string>
+    <string name="proxmox_disk_read_title">Lectura\u0020</string>
+    <string name="proxmox_disk_write_title">Escritura\u0020</string>
     <string name="proxmox_disk_rate_value">%1$.1f %2$s</string>
     <string name="proxmox_disk_rate_zero">0 KB</string>
     <string name="proxmox_status_unknown">Hipervisor Proxmox indeterminado</string>
@@ -67,30 +65,10 @@
 
     <string name="percent_format">%.1f%%</string>
 
-    <!-- Notifications and errors -->
-    <string name="notification_channel_name">MQTT Service Notifications</string>
-    <string name="notification_text_broker_disconnected">Desconectado del broker MQTT</string>
-    <string name="notification_text_service_stopped_title">Servicio MQTT detenido</string>
-    <string name="notification_text_service_stopped_body">@string/status_disconnected_capitalized</string>
-    <string name="notification_text_reconnecting_title">Reconectando...</string>
-    <string name="notification_text_reconnecting_body">Intentando reconectar</string>
-    <string name="notification_title_service">Servicio MQTT</string>
-    <string name="notification_text_service_reconnected">@string/status_reconnected_capitalized</string>
-    <string name="notification_text_service_connected">@string/status_connected_capitalized</string>
-    <string name="notification_text_connecting_title">Conectando...</string>
-    <string name="notification_text_connecting_body">Estableciendo conexion MQTT</string>
-    <string name="error_publication_missing_data">Faltan datos de publicacion (topic o mensaje)</string>
-    <string name="error_connection_lost">Conexion perdida: %1$s</string>
-    <string name="error_subscription">Error al suscribirse: %1$s</string>
     <string name="error_parse_grade">Error parseando grado: %1$s</string>
-    <string name="error_rpc_global_status">Error al obtener estado global: %1$s</string>
-    <string name="error_parse_email_event">Error parseando evento de email: %1$s</string>
-    <string name="error_connection_failure">Fallo de conexion: %1$s</string>
-    <string name="error_not_connected_publish">No conectado al broker. No se publico en %1$s</string>
-    <string name="error_publish_topic">Error publicando en %1$s: %2$s</string>
 
     <!-- Contacts -->
-    <string name="cheat_sheet_visit">Visitar</string>
+  <string name="cheat_sheet_visit">Visitar</string>
     <string name="cheat_sheet_ping">Ping</string>
     <string name="cheat_sheet_ping_placeholder">Ejecuta una prueba para ver resultados.</string>
     <string name="cheat_sheet_ping_running">Ejecutando ping</string>
@@ -102,12 +80,15 @@
     <string name="cheat_sheet_open_url_error">No se pudo abrir el navegador.</string>
     <string name="cheat_sheet_tw_title">firewall NGFWs fortigate TW</string>
     <string name="cheat_sheet_pm_title">vpn portal PM</string>
+    <string name="cheat_sheet_web_com_title">web comunicaciones</string>
     <string name="cheat_sheet_modem_telef_title">modem telef.</string>
-    <string name="cheat_sheet_tw_url" translatable="false">https://10.10.10.10:8443</string>
-    <string name="cheat_sheet_tw_ip" translatable="false">10.10.10.10</string>
-    <string name="cheat_sheet_pm_url" translatable="false">https://vpn.ejemplo.org/</string>
-    <string name="cheat_sheet_pm_ip" translatable="false">10.10.10.20</string>
-    <string name="cheat_sheet_modem_telef_host" translatable="false">10.10.10.30</string>
+    <string name="cheat_sheet_tw_url" translatable="false">https://200.26.107.14:8443</string>
+    <string name="cheat_sheet_tw_ip" translatable="false">200.26.107.14</string>
+    <string name="cheat_sheet_pm_url" translatable="false">https://vpn.servicoop.com.ar/</string>
+    <string name="cheat_sheet_pm_ip" translatable="false">186.0.209.154</string>
+    <string name="cheat_sheet_web_com_url" translatable="false">https://comunicaciones.servicoop.com.ar</string>
+    <string name="cheat_sheet_web_com_ip" translatable="false">138.36.99.117</string>
+    <string name="cheat_sheet_modem_telef_host" translatable="false">200.63.163.36</string>
     <string name="cheat_sheet_tcp_probe">Probar puerto TCP</string>
     <string name="cheat_sheet_tcp_placeholder">Sin prueba realizada.</string>
     <string name="cheat_sheet_tcp_running">Probando puerto...</string>
@@ -115,56 +96,47 @@
     <string name="cheat_sheet_tcp_closed">Puerto %1$d cerrado</string>
     <string name="cheat_sheet_tcp_unknown">No se pudo determinar el estado del puerto.</string>
     <string name="cheat_sheet_tcp_target">%1$s:%2$d</string>
-    <string name="cheat_sheet_notes" translatable="false">
-
-        vpn-tw-rebomb-telefonica
-        			10.10.10.10
-        			usuario1
-        			clave1
-
-        vpn-tw-rebomb
-        			10.10.10.11
-        			usuario2
-        			clave2
-        			IP PC: 192.168.0.10
-
-        vpn-pm-font-scada
-        			10.10.10.20   enlace1
-        			usuario3
-        			clave3
-
-        			10.10.10.21    red interna
-        			usuario4
-        			clave4
-
-        			10.10.10.22
-        			usuario5
-        			clave5
-
-        			10.10.10.23
-        			usuario6
-        			clave6
-        			vnc     10.10.10.50 / clave7
-
-        vpn por nodo net ejemplo
-        			10.10.10.40
-        			usuario7
-        			clave8
-
-        Se conecta al router de ejemplo - red de energia
-        Mediante escritorio remoto conectar al Work-02  a la IP 192.1.1.1,
-        una vez en esta maquina  hacer VNC al SCADA 10.10.10.2
-    </string>
+    <string name="cheat_sheet_notes" translatable="false">Las credenciales operativas se administran fuera de la aplicación.</string>
+    <string name="cheat_sheet_ge_title">Interruptor linea Estivariz</string>
+    <string name="cheat_sheet_ge_estivariz_title">Interruptor linea Estivariz</string>
+    <string name="cheat_sheet_ge_fontana_title">Interruptor linea Fontana</string>
+    <string name="cheat_sheet_ge_line_open">Linea abierta</string>
+    <string name="cheat_sheet_ge_line_closed">Linea cerrada</string>
+    <string name="cheat_sheet_ge_unknown">Linea sin datos</string>
 
     <string name="email_test_button">Probar email</string>
     <string name="email_test_disabled">Broker desconectado</string>
     <string name="email_test_sent">Solicitando prueba de email</string>
+    <string name="telefonos_section_fontana">Fontana</string>
+    <string name="telefonos_section_estivariz">Estivariz</string>
+    <string name="telefonos_section_general">General</string>
+    <string name="telefonos_touch_to_call">Llamar</string>
+    <string name="telefonos_error_open_dialer">No se pudo abrir la app de llamadas.</string>
+    <string name="telefono_comment_rotativas">entrada lineas rotativas</string>
+    <string name="telefono_comment_jefes">jefes</string>
+    <string name="telefono_comment_linea_fija">solo funciona desde linea fija</string>
+    <string name="telefono_fontana_4453400" translatable="false">4453400</string>
+    <string name="telefono_fontana_4453355" translatable="false">4453355</string>
+    <string name="telefono_fontana_4453222" translatable="false">4453222</string>
+    <string name="telefono_fontana_4453232" translatable="false">4453232</string>
+    <string name="telefono_fontana_4471718" translatable="false">4471718</string>
+    <string name="telefono_fontana_2804675614" translatable="false">2804675614</string>
+    <string name="telefono_estivariz_4454041" translatable="false">4454041</string>
+    <string name="telefono_estivariz_4471837" translatable="false">4471837</string>
+    <string name="telefono_estivariz_4472066" translatable="false">4472066</string>
+    <string name="telefono_estivariz_4472131" translatable="false">4472131</string>
+    <string name="telefono_estivariz_4455768" translatable="false">4455768</string>
+    <string name="telefono_estivariz_2804675553" translatable="false">2804675553</string>
+    <string name="telefono_estivariz_2804992999" translatable="false">2804992999</string>
+    <string name="telefono_estivariz_2804607705" translatable="false">2804607705</string>
+    <string name="telefono_general_08006667378" translatable="false">08006667378</string>
     <!-- charo-daemon metrics -->
     <string name="charo_list_empty">Sin datos recibidos de charo-daemon.</string>
     <string name="charo_instance_unknown_id">(sin id)</string>
     <string name="charo_time_unknown">Fecha no disponible</string>
     <string name="charo_status_online_short">Online</string>
     <string name="charo_status_offline_short">Offline</string>
+    <string name="charo_status_error_short">Error</string>
     <string name="charo_status_unknown_short">Desconocido</string>
     <string name="charo_row_window">%1$ds</string>
     <string name="charo_cpu_value">CPU %.1f%%</string>
@@ -173,21 +145,32 @@
     <string name="charo_mem_na">Mem N/D</string>
     <string name="charo_row_summary">%1$s &#8226; %2$s &#8226; %3$s &#8226; %4$s &#8226; %5$s</string>
     <string name="charo_row_status_with_summary">%1$s &#8226; %2$s</string>
-    <string name="charo_status_label_prefix">Estado: %1$s</string>
+    <string name="charo_status_label_prefix">%1$s</string>
     <string name="error_parse_charo_metrics">Error parseando metricas de charo-daemon: %1$s</string>
     <string name="error_parse_backend_status">Error parseando estado del backend: %1$s</string>
     <string name="charo_tile_updated_at">Actualizado: %1$s</string>
     <string name="charo_tile_window_format">%1$s &#8226; Ventana %2$ds</string>
     <string name="charo_tile_cpu_label">CPU</string>
     <string name="charo_tile_memory_label">Memoria</string>
+    <string name="charo_temp_na">Temp CPU ND</string>
+    <string name="charo_temp_format">Temp CPU: %.1f C</string>
+    <string name="charo_toggle_desc">Alternar tarjeta</string>
     <string name="charo_process_section_title">Procesos monitoreados</string>
     <string name="charo_process_empty">Sin datos de procesos</string>
     <string name="charo_process_state_active">activo</string>
     <string name="charo_process_state_stopped">detenido</string>
     <string name="charo_process_state_unknown">!datos</string>
     <string name="charo_process_chip_text">%1$s\n%2$s</string>
+    <string name="charo_network_section_title">Interfaces de red</string>
+    <string name="charo_network_empty">Sin interfaces IPv4 visibles</string>
+    <string name="charo_network_status_up">activa</string>
+    <string name="charo_network_status_down">inactiva</string>
+    <string name="charo_network_status_unknown">!datos</string>
+    <string name="charo_network_virtual_name">%1$s (virtual)</string>
+    <string name="charo_network_ip_mask">%1$s / %2$s</string>
+    <string name="charo_network_chip_text">%1$s\nEstado: %2$s\nIP: %3$s</string>
     <plurals name="charo_row_samples">
         <item quantity="one">%d muestra</item>
         <item quantity="other">%d muestras</item>
     </plurals>
-</resources
+</resources>

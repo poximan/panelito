@@ -10,37 +10,39 @@ No es fuente de verdad de ningun dominio operativo. Puede conservar datos locale
 
 ## Integracion MQTT
 
-La app se conecta al broker configurado y consume los contratos declarados en `../docs/contratos-sistema.md`.
+La app se conecta al broker configurado y consume los contratos versionados de `lechuza-server`.
+El broker y las credenciales se inyectan desde `local.properties` (ver `local.properties.example`); no se guardan en recursos ni en git.
 
 Topicos consumidos principales:
 
-- `lechuza-server/router/status`
-- `lechuza-server/modbus/grd/summary`
-- `lechuza-server/modbus/grd/disconnected`
-- `lechuza-server/modbus/ge/edif-estivariz/status`
-- `lechuza-server/modbus/ge/edif-fontana/status`
-- `lechuza-server/email/status`
-- `lechuza-server/email/event`
-- `lechuza-server/pve/status`
-- `panelexemys/status`
-- `charito/state`
+- `lechu/v1/modem/status`
+- `lechu/v1/exemys/grd/summary`
+- `lechu/v1/exemys/grd/disconnected`
+- `lechu/v1/generators/edif-estivariz/status`
+- `lechu/v1/generators/edif-fontana/status`
+- `lechu/v1/email/status`
+- `lechu/v1/email/event`
+- `lechu/v1/proxmox/status`
+- `lechu/v1/services/lechu/status`
+- `lechu/v1/charito/status`
 
 Topicos de comando/respuesta:
 
-- `lechuza-server/rpc/req/{accion}`
-- `lechuza-server/rpc/res/{clientId}/{corr}`
+- `lechu/v1/rpc/request/{accion}`
+- `lechu/v1/rpc/response/{clientId}/{corr}`
 
 Acciones RPC vigentes:
 
 - `get_global_status`
 - `get_modem_status`
+- `get_email_events`
 - `send_email_test`
 
 ## Fronteras
 
 - No consume HTTP de `lechuza-server`.
 - No accede a SQLite ni archivos internos de ningun servicio.
-- No consume directamente `charodaemon/host/{clientId}/*`; el estado agregado llega por `charito/state`.
+- No consume directamente `charodaemon/host/{clientId}/*`; el estado agregado llega por `lechu/v1/charito/status`.
 - No debe compensar contratos incompletos con canales alternativos.
 
 ## Estructura
@@ -54,10 +56,8 @@ Acciones RPC vigentes:
 | Teléfonos | `TelefonosFragment.kt` | recursos versionados de teléfonos | `TelefonosAdapter.kt` |
 | Ayuda | `CheatSheetFragment.kt` | catálogo local de accesos y estados | `CheatSheetAdapter.kt` |
 
-`MainActivity` compone y navega. `MQTTService` y `data/mqtt` son compartidos porque administran una sola conexión al broker. No hay DAO por pestaña: Panelito consume proyecciones MQTT y no persiste datos operativos.
+`MainActivity` compone y navega. `MqttSession` y `data/mqtt` son compartidos porque administran una sola conexión al broker mientras la app está en primer plano. No hay DAO por pestaña: Panelito consume proyecciones MQTT y solo conserva localmente eventos de correo para continuidad visual.
 
 ## Configuracion y secretos
 
 La configuracion operativa debe mantenerse fuera de git cuando contenga credenciales, hosts reales o endpoints sensibles. Los valores versionados deben ser plantillas o ejemplos sin secreto real.
-
-La metodología general está en `../../../metodologia.txt`.

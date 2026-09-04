@@ -1,21 +1,14 @@
 package servicoop.comunic.panelito.repository
 
 import kotlinx.coroutines.flow.Flow
+import servicoop.comunic.panelito.core.model.EmailEvent
 
 /**
  * Abstraccion de origen de settings.
  * La UI solo conoce esta interfaz.
  */
 interface SettingsRepository {
-    /** emite el estado del flag service_enabled */
-    fun getServiceEnabled(): Flow<Boolean>
+    fun getEmailEvents(): Flow<List<EmailEvent>>
 
-    /** setea el flag service_enabled */
-    suspend fun setServiceEnabled(enabled: Boolean)
-
-    /**
-     * Garantiza defaults de primera ejecucion:
-     * - si no hay init_done, setea service_enabled=true y marca init_done=true
-     */
-    suspend fun ensureDefaults()
+    suspend fun saveEmailEvents(events: List<EmailEvent>)
 }

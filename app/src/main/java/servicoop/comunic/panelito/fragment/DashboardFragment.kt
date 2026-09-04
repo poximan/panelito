@@ -1,9 +1,5 @@
 package servicoop.comunic.panelito.fragment
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -12,15 +8,18 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.DashboardGrdParser
 import servicoop.comunic.panelito.core.util.Thresholds
 import servicoop.comunic.panelito.core.model.ModemEstado
-import servicoop.comunic.panelito.services.mqtt.MQTTService
+import servicoop.comunic.panelito.services.mqtt.MqttState
 import servicoop.comunic.panelito.ui.adapter.DisconnectedGrdAdapter
 
 class DashboardFragment : Fragment() {
@@ -32,39 +31,8 @@ class DashboardFragment : Fragment() {
     private lateinit var indicatorSalud: View
     private lateinit var rvGrds: RecyclerView
     private lateinit var grdsAdapter: DisconnectedGrdAdapter
-    private var lastModemState: ModemEstado? = null
-
-    private val mqttReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            when (intent?.action) {
-                MQTTService.ACTION_BROKER_ESTADO -> {
-                    val estado = intent.getStringExtra(MQTTService.EXTRA_BROKER_ESTADO) ?: return
-                    handleBrokerState(estado)
-                }
-                MQTTService.ACTION_MODEM_ESTADO -> {
-                    val estadoRaw = intent.getStringExtra(MQTTService.EXTRA_MODEM_ESTADO) ?: return
-                    val estado = runCatching { ModemEstado.valueOf(estadoRaw) }.getOrElse { ModemEstado.DESCONOCIDO }
-                    actualizarModemEstado(estado)
-                }
-                MQTTService.ACTION_ACTUALIZAR_GRADO -> {
-                    val pct = intent.getDoubleExtra(MQTTService.EXTRA_GRADO_PCT, Double.NaN)
-                    if (!pct.isNaN()) actualizarGrado(pct)
-                }
-                MQTTService.ACTION_ACTUALIZAR_GRDS -> {
-                    val json = intent.getStringExtra(MQTTService.EXTRA_GRDS_JSON) ?: return
-                    actualizarGrds(json)
-                }
-                MQTTService.ACTION_ERROR -> {
-                    val err = intent.getStringExtra(MQTTService.EXTRA_ERROR) ?: return
-                    Log.e("DashboardFragment", "ERROR: $err")
-                }
-                MQTTService.ACTION_BACKEND_STATUS -> {
-                    val estado = intent.getStringExtra(MQTTService.EXTRA_BACKEND_STATUS) ?: return
-                    handleBackendStatus(estado)
-                }
-            }
-        }
-    }
+    private val mqttSession
+        get() = (requireActivity().application as PanelitoApplication).mqttSession
 
     companion object {
         fun newInstance(): DashboardFragment = DashboardFragment()
@@ -91,49 +59,34 @@ class DashboardFragment : Fragment() {
         return v
     }
 
-    override fun onStart() {
-        super.onStart()
-        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
-            mqttReceiver,
-            IntentFilter().apply {
-                addAction(MQTTService.ACTION_BROKER_ESTADO)
-                addAction(MQTTService.ACTION_MODEM_ESTADO)
-                addAction(MQTTService.ACTION_ACTUALIZAR_GRADO)
-                addAction(MQTTService.ACTION_ACTUALIZAR_GRDS)
-                addAction(MQTTService.ACTION_ERROR)
-                addAction(MQTTService.ACTION_BACKEND_STATUS)
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                mqttSession.state.collect { render(it) }
             }
-        )
+        }
     }
 
-    override fun onStop() {
-        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(mqttReceiver)
-        super.onStop()
-    }
-
-    private fun handleBrokerState(estado: String) {
-        val brokerEstado = runCatching { BrokerEstado.valueOf(estado) }.getOrElse { BrokerEstado.ERROR }
+    private fun render(state: MqttState) {
+        val brokerEstado = state.broker
         when (brokerEstado) {
-            BrokerEstado.CONECTADO -> lastModemState?.let { actualizarModemEstado(it) }
+            BrokerEstado.CONECTADO -> {
+                actualizarModemEstado(state.modem)
+                state.gradoPct?.let { actualizarGrado(it) }
+                state.grdsJson?.let { actualizarGrds(it) }
+            }
             BrokerEstado.DESCONECTADO -> {
                 mostrarModemSinDatos()
-                actualizarGrado(0.0)
-                grdsAdapter.submit(emptyList())
             }
             BrokerEstado.CONECTANDO,
             BrokerEstado.REINTENTANDO,
             BrokerEstado.ERROR -> mostrarModemSinDatos()
         }
-    }
-
-    private fun handleBackendStatus(estado: String) {
-        if (estado.equals(MQTTService.STATUS_OFFLINE, ignoreCase = true)) {
-            mostrarBackendIncerto()
-        }
+        state.error?.let { Log.e("DashboardFragment", it) }
     }
 
     private fun actualizarModemEstado(estado: ModemEstado) {
-        lastModemState = estado
         val estadoTexto = when (estado) {
             ModemEstado.ABIERTO -> getString(R.string.modem_state_open)
             ModemEstado.CERRADO -> getString(R.string.modem_state_closed)
@@ -149,17 +102,8 @@ class DashboardFragment : Fragment() {
     }
 
     private fun mostrarModemSinDatos() {
-        lastModemState = ModemEstado.DESCONOCIDO
         txtModem.text = getString(R.string.modem_status, getString(R.string.status_unknown_capitalized))
         indicatorModem.setBackgroundResource(R.drawable.led_naranja)
-    }
-
-    private fun mostrarBackendIncerto() {
-        mostrarModemSinDatos()
-        txtGradoPct.text = getString(R.string.value_not_available)
-        progressGrado.progress = 0
-        indicatorSalud.setBackgroundResource(R.drawable.led_naranja)
-        grdsAdapter.submit(emptyList())
     }
 
     private fun actualizarGrado(porcentaje: Double) {

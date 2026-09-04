@@ -1,9 +1,5 @@
 package servicoop.comunic.panelito.fragment
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,34 +7,22 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import servicoop.comunic.panelito.R
+import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.CharitoStateParser
-import servicoop.comunic.panelito.services.mqtt.MQTTService
-import servicoop.comunic.panelito.ui.MainActivity
 import servicoop.comunic.panelito.ui.adapter.CharitoInstanceAdapter
 
 class CharitoFragment : Fragment() {
     private lateinit var recycler: RecyclerView
     private lateinit var empty: TextView
     private val adapter = CharitoInstanceAdapter()
-    private var lastPayload: String? = null
-
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != MQTTService.ACTION_CHARITO_ESTADO) return
-            val raw = intent.getStringExtra(MQTTService.EXTRA_CHARITO_ESTADO) ?: return
-            lastPayload = raw
-            parseAndRender(raw)
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        lastPayload = savedInstanceState?.getString("charito_last_state")
-    }
+    private val mqttSession
+        get() = (requireActivity().application as PanelitoApplication).mqttSession
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val view = inflater.inflate(R.layout.fragment_charito, container, false)
@@ -49,34 +33,16 @@ class CharitoFragment : Fragment() {
         return view
     }
 
-    override fun onStart() {
-        super.onStart()
-        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
-            receiver,
-            IntentFilter(MQTTService.ACTION_CHARITO_ESTADO)
-        )
-        requestCachedState()
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
         adapter.resetExpandedState()
-        lastPayload?.let { parseAndRender(it) } ?: showEmptyState()
-    }
-
-    override fun onStop() {
-        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(receiver)
-        super.onStop()
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        lastPayload?.let { outState.putString("charito_last_state", it) }
-    }
-
-    private fun requestCachedState() {
-        val hostActivity = activity as? MainActivity ?: return
-        if (!hostActivity.isBrokerDesiredEnabled()) return
-        val intent = Intent(requireContext(), MQTTService::class.java).apply {
-            putExtra(MQTTService.EXTRA_SOLICITAR_ESTADO, true)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                mqttSession.state.collect { state ->
+                    state.charitoJson?.let(::parseAndRender) ?: showEmptyState()
+                }
+            }
         }
-        requireContext().startService(intent)
     }
 
     private fun parseAndRender(raw: String) {
@@ -90,7 +56,7 @@ class CharitoFragment : Fragment() {
                 recycler.isVisible = true
             }
         } catch (_: Exception) {
-            showEmptyState()
+            if (adapter.itemCount == 0) showEmptyState()
         }
     }
 

@@ -11,11 +11,11 @@
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <Switch
-            android:id="@+id/switch_connect"
+        <TextView
+            android:id="@+id/txt_connection_label"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/switch_connect_broker" />
+            android:text="@string/mqtt_connection_label" />
 
         <View
             android:id="@+id/indicator_broker"
