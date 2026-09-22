@@ -3,6 +3,7 @@ package servicoop.comunic.panelito.data.datastore
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -20,6 +21,7 @@ class SettingsDataStore(private val context: Context) : SettingsRepository {
 
     companion object {
         private val KEY_EMAIL_EVENTS = stringPreferencesKey("email_events")
+        private val KEY_MOBILE_UPDATE_OMISSIONS = intPreferencesKey("mobile_update_omissions")
     }
 
     override fun getEmailEvents(): Flow<List<EmailEvent>> = context.dataStore.data.map { prefs ->
@@ -31,14 +33,23 @@ class SettingsDataStore(private val context: Context) : SettingsRepository {
         events.take(50).forEach { event ->
             payload.put(
                 JSONObject()
+                    .put("id", event.id)
                     .put("type", event.type)
                     .put("subject", event.subject)
-                    .put("ok", event.ok)
+                    .put("status", event.status)
                     .put("timestamp", event.timestamp)
                     .put("detail", event.detail),
             )
         }
         context.dataStore.edit { prefs -> prefs[KEY_EMAIL_EVENTS] = payload.toString() }
+    }
+
+    override fun getMobileUpdateOmissions(): Flow<Int> = context.dataStore.data.map { prefs ->
+        (prefs[KEY_MOBILE_UPDATE_OMISSIONS] ?: 0).coerceAtLeast(0)
+    }
+
+    override suspend fun saveMobileUpdateOmissions(value: Int) {
+        context.dataStore.edit { prefs -> prefs[KEY_MOBILE_UPDATE_OMISSIONS] = value.coerceAtLeast(0) }
     }
 
     private fun decodeEmailEvents(raw: String): List<EmailEvent> {
@@ -52,9 +63,12 @@ class SettingsDataStore(private val context: Context) : SettingsRepository {
                     if (timestamp.isBlank()) continue
                     add(
                         EmailEvent(
+                            id = item.optString("id"),
                             type = item.optString("type", "email"),
                             subject = item.optString("subject"),
-                            ok = item.optBoolean("ok", false),
+                            status = item.optString("status").ifBlank {
+                                if (item.optBoolean("ok", false)) "sent" else "failed"
+                            },
                             timestamp = timestamp,
                             detail = item.optString("detail"),
                         ),

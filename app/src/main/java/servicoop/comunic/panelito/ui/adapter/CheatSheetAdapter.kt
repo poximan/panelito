@@ -3,6 +3,8 @@ package servicoop.comunic.panelito.ui.adapter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AlphaAnimation
+import android.view.animation.Animation
 import android.widget.Button
 import android.widget.TextView
 import androidx.core.content.ContextCompat
@@ -12,6 +14,8 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.GeEstado
+import servicoop.comunic.panelito.core.model.WakeOnLanState
+import servicoop.comunic.panelito.core.model.WakeOnLanStatus
 
 sealed class CheatSheetEntry {
     data class Endpoint(
@@ -39,19 +43,26 @@ sealed class CheatSheetEntry {
         val estado: GeEstado
     ) : CheatSheetEntry()
 
+    data class WakeOnLan(
+        val id: Int,
+        val state: WakeOnLanState,
+    ) : CheatSheetEntry()
+
     data class Notes(val text: String) : CheatSheetEntry()
 }
 
 class CheatSheetAdapter(
     private val onVisitClicked: (CheatSheetEntry.Endpoint) -> Unit,
     private val onPingClicked: (CheatSheetEntry.Endpoint) -> Unit,
-    private val onTcpProbeClicked: (CheatSheetEntry.TcpProbe) -> Unit
+    private val onTcpProbeClicked: (CheatSheetEntry.TcpProbe) -> Unit,
+    private val onWakeOnLanClicked: () -> Unit,
 ) : ListAdapter<CheatSheetEntry, RecyclerView.ViewHolder>(DiffCallback) {
 
     override fun getItemViewType(position: Int): Int = when (getItem(position)) {
         is CheatSheetEntry.Endpoint -> VIEW_TYPE_ENDPOINT
         is CheatSheetEntry.TcpProbe -> VIEW_TYPE_TCP_PROBE
         is CheatSheetEntry.GeStatus -> VIEW_TYPE_GE_STATUS
+        is CheatSheetEntry.WakeOnLan -> VIEW_TYPE_WAKE_ON_LAN
         is CheatSheetEntry.Notes -> VIEW_TYPE_NOTES
     }
 
@@ -73,6 +84,11 @@ class CheatSheetAdapter(
                 GeStatusViewHolder(view)
             }
 
+            VIEW_TYPE_WAKE_ON_LAN -> {
+                val view = inflater.inflate(R.layout.item_cheat_sheet_wol, parent, false)
+                WakeOnLanViewHolder(view, onWakeOnLanClicked)
+            }
+
             VIEW_TYPE_NOTES -> {
                 val view = inflater.inflate(R.layout.item_cheat_sheet_notes, parent, false)
                 NotesViewHolder(view)
@@ -87,6 +103,7 @@ class CheatSheetAdapter(
             is EndpointViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.Endpoint)
             is TcpProbeViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.TcpProbe)
             is GeStatusViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.GeStatus)
+            is WakeOnLanViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.WakeOnLan)
             is NotesViewHolder -> holder.bind(getItem(position) as CheatSheetEntry.Notes)
         }
     }
@@ -169,6 +186,40 @@ class CheatSheetAdapter(
         }
     }
 
+    private class WakeOnLanViewHolder(
+        itemView: View,
+        private val onWakeOnLan: () -> Unit,
+    ) : RecyclerView.ViewHolder(itemView) {
+        private val button: Button = itemView.findViewById(R.id.btn_wololo)
+        private val statusView: TextView = itemView.findViewById(R.id.txt_wol_status)
+
+        fun bind(item: CheatSheetEntry.WakeOnLan) {
+            val context = itemView.context
+            button.clearAnimation()
+            val (textRes, pulseDuration) = when (item.state.status) {
+                WakeOnLanStatus.IDLE -> R.string.wol_status_idle to null
+                WakeOnLanStatus.REQUESTING -> R.string.wol_status_requesting to 180L
+                WakeOnLanStatus.PACKET_SENT -> R.string.wol_status_packet_sent to 750L
+                WakeOnLanStatus.SSH_OPEN -> R.string.wol_status_ssh_open to null
+                WakeOnLanStatus.ERROR -> R.string.wol_status_error to null
+            }
+            statusView.text = item.state.detail ?: context.getString(textRes)
+            val working = item.state.status == WakeOnLanStatus.REQUESTING ||
+                item.state.status == WakeOnLanStatus.PACKET_SENT
+            button.isEnabled = !working
+            pulseDuration?.let { duration ->
+                button.startAnimation(
+                    AlphaAnimation(1f, 0.35f).apply {
+                        this.duration = duration
+                        repeatCount = Animation.INFINITE
+                        repeatMode = Animation.REVERSE
+                    },
+                )
+            }
+            button.setOnClickListener { if (!working) onWakeOnLan() }
+        }
+    }
+
     private class NotesViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val notesView: TextView = itemView.findViewById(R.id.txt_cheat_notes)
 
@@ -182,6 +233,7 @@ class CheatSheetAdapter(
         private const val VIEW_TYPE_NOTES = 2
         private const val VIEW_TYPE_TCP_PROBE = 3
         private const val VIEW_TYPE_GE_STATUS = 4
+        private const val VIEW_TYPE_WAKE_ON_LAN = 5
 
         private val DiffCallback = object : DiffUtil.ItemCallback<CheatSheetEntry>() {
             override fun areItemsTheSame(
@@ -194,6 +246,8 @@ class CheatSheetAdapter(
                     oldItem is CheatSheetEntry.TcpProbe && newItem is CheatSheetEntry.TcpProbe ->
                         oldItem.id == newItem.id
                     oldItem is CheatSheetEntry.GeStatus && newItem is CheatSheetEntry.GeStatus ->
+                        oldItem.id == newItem.id
+                    oldItem is CheatSheetEntry.WakeOnLan && newItem is CheatSheetEntry.WakeOnLan ->
                         oldItem.id == newItem.id
                     oldItem is CheatSheetEntry.Notes && newItem is CheatSheetEntry.Notes -> true
                     else -> false

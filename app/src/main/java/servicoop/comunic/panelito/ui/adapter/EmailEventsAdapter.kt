@@ -40,12 +40,19 @@ class EmailEventsAdapter : RecyclerView.Adapter<EmailEventsAdapter.ViewHolder>()
         fun bind(event: EmailEvent) {
             val ctx = itemView.context
             subject.text = event.subject.ifBlank { ctx.getString(R.string.value_not_available) }
-            if (event.ok) {
-                indicator.setBackgroundResource(R.drawable.led_verde)
-                status.text = ctx.getString(R.string.email_event_status_ok)
-            } else {
-                indicator.setBackgroundResource(R.drawable.led_rojo)
-                status.text = ctx.getString(R.string.email_event_status_fail)
+            when (event.status.lowercase()) {
+                "sent" -> {
+                    indicator.setBackgroundResource(R.drawable.led_verde)
+                    status.text = ctx.getString(R.string.email_event_status_sent)
+                }
+                "accepted", "queued", "processing" -> {
+                    indicator.setBackgroundResource(R.drawable.led_naranja)
+                    status.text = ctx.getString(R.string.email_event_status_pending)
+                }
+                else -> {
+                    indicator.setBackgroundResource(R.drawable.led_rojo)
+                    status.text = ctx.getString(R.string.email_event_status_fail)
+                }
             }
 
             val ts = AppTime.formatForPresentation(

@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.GeEstado
+import servicoop.comunic.panelito.core.model.WakeOnLanState
 import servicoop.comunic.panelito.services.mqtt.MqttSession
 import servicoop.comunic.panelito.ui.adapter.CheatSheetAdapter
 import servicoop.comunic.panelito.ui.adapter.CheatSheetEntry
@@ -35,7 +36,7 @@ class CheatSheetFragment : Fragment() {
 
     private lateinit var recyclerView: RecyclerView
     private val cheatSheetAdapter by lazy {
-        CheatSheetAdapter(::openEndpointUrl, ::runPingForEndpoint, ::runTcpProbe)
+        CheatSheetAdapter(::openEndpointUrl, ::runPingForEndpoint, ::runTcpProbe, ::runWakeOnLan)
     }
     private val items = mutableListOf<CheatSheetEntry>()
     private val mqttSession
@@ -59,6 +60,7 @@ class CheatSheetFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 mqttSession.state.collect { state ->
                     state.geStates.forEach { (building, status) -> updateGeStatus(building, status) }
+                    updateWakeOnLan(state.wakeOnLan)
                 }
             }
         }
@@ -125,6 +127,7 @@ class CheatSheetFragment : Fragment() {
                 estado = GeEstado.DESCONOCIDO
             )
         )
+        items.add(CheatSheetEntry.WakeOnLan(id = 7, state = WakeOnLanState()))
         items.add(CheatSheetEntry.Notes(getString(R.string.cheat_sheet_notes)))
         submitItems()
     }
@@ -188,6 +191,10 @@ class CheatSheetFragment : Fragment() {
         }
     }
 
+    private fun runWakeOnLan() {
+        mqttSession.requestWakeOnLan()
+    }
+
     private fun updateEndpoint(
         id: Int,
         transformer: (CheatSheetEntry.Endpoint) -> CheatSheetEntry.Endpoint
@@ -220,6 +227,17 @@ class CheatSheetFragment : Fragment() {
             val current = items[index] as CheatSheetEntry.GeStatus
             if (current.estado != estado) {
                 items[index] = current.copy(estado = estado)
+                submitItems()
+            }
+        }
+    }
+
+    private fun updateWakeOnLan(state: WakeOnLanState) {
+        val index = items.indexOfFirst { it is CheatSheetEntry.WakeOnLan }
+        if (index >= 0) {
+            val current = items[index] as CheatSheetEntry.WakeOnLan
+            if (current.state != state) {
+                items[index] = current.copy(state = state)
                 submitItems()
             }
         }

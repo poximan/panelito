@@ -24,6 +24,11 @@
 
     <!-- Fragment labels -->
     <string name="broker_status">Broker: %1$s</string>
+    <string name="mobile_update_title">Actualización disponible</string>
+    <string name="mobile_update_message">Está disponible Panelito %1$s. El archivo se verificará antes de abrir el instalador.</string>
+    <string name="mobile_update_install">Actualizar</string>
+    <string name="mobile_update_later">Más tarde</string>
+    <string name="mobile_update_failed">No se pudo verificar o abrir la actualización.</string>
     <string name="modem_status">Modem: %1$s</string>
     <string name="email_summary_no_data">Email: sin datos</string>
     <string name="email_summary_no_service">Email: sin servicio</string>
@@ -59,11 +64,13 @@
     <string name="proxmox_cpus_label">vCPU: %1$d</string>
     <string name="proxmox_uptime_label">Uptime: %1$s</string>
     <string name="email_events_title">Eventos de correo</string>
-    <string name="email_event_status_ok">Enviado</string>
+    <string name="email_event_status_sent">Enviado</string>
+    <string name="email_event_status_pending">Aceptado, pendiente de entrega</string>
     <string name="email_event_status_fail">Fallo</string>
     <string name="email_event_timestamp">Emitido: %1$s</string>
 
     <string name="percent_format">%.1f%%</string>
+    <string name="percent_with_unavailable_format">%1$.1f%% · %2$d sin lectura</string>
 
     <string name="error_parse_grade">Error parseando grado: %1$s</string>
 
@@ -103,6 +110,17 @@
     <string name="cheat_sheet_ge_line_open">Linea abierta</string>
     <string name="cheat_sheet_ge_line_closed">Linea cerrada</string>
     <string name="cheat_sheet_ge_unknown">Linea sin datos</string>
+    <string name="wol_title">Encendido remoto</string>
+    <string name="wol_button">wololo</string>
+    <string name="wol_button_description">Encender equipo remoto mediante Wake-on-LAN</string>
+    <string name="wol_status_idle">Listo para enviar el paquete mágico a 10.10.4.125.</string>
+    <string name="wol_status_requesting">Enviando la orden a Lechu...</string>
+    <string name="wol_status_packet_sent">Paquete mágico emitido; esperando que abra SSH.</string>
+    <string name="wol_status_ssh_open">Equipo disponible por SSH.</string>
+    <string name="wol_status_error">No se pudo completar el encendido.</string>
+    <string name="wol_error_broker">MQTT no está conectado.</string>
+    <string name="wol_error_timeout">Lechu no confirmó el estado del equipo dentro del plazo.</string>
+    <string name="wol_error_request">No se pudo solicitar el encendido remoto.</string>
 
     <string name="email_test_button">Probar email</string>
     <string name="email_test_disabled">Broker desconectado</string>

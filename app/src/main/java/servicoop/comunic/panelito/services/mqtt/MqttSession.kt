@@ -25,10 +25,14 @@ import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.json.JSONArray
 import org.json.JSONObject
+import servicoop.comunic.panelito.BuildConfig
 import servicoop.comunic.panelito.core.model.BrokerEstado
 import servicoop.comunic.panelito.core.model.EmailEvent
 import servicoop.comunic.panelito.core.model.GeEstado
 import servicoop.comunic.panelito.core.model.ModemEstado
+import servicoop.comunic.panelito.core.model.MobileReleaseState
+import servicoop.comunic.panelito.core.model.WakeOnLanState
+import servicoop.comunic.panelito.core.model.WakeOnLanStatus
 import servicoop.comunic.panelito.data.datastore.SettingsDataStore
 import servicoop.comunic.panelito.data.mqtt.MqttConfig
 import java.util.UUID
@@ -53,6 +57,8 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     private var connectionJob: Job? = null
     private var client: MqttClient? = null
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
+    private var wakeOnLanCorrelation: String? = null
+    private var wakeOnLanTimeoutJob: Job? = null
     private val clientId: String by lazy {
         val androidId = Settings.Secure.getString(
             appContext.contentResolver,
@@ -68,6 +74,12 @@ class MqttSession(context: Context) : MqttCallbackExtended {
         newScope.launch {
             settings.getEmailEvents().first().let { events ->
                 stateStore.update { it.copy(emailEvents = events) }
+            }
+        }
+        newScope.launch {
+            val omissions = settings.getMobileUpdateOmissions().first()
+            stateStore.update { state ->
+                state.copy(mobileRelease = state.mobileRelease.copy(omissionsUsed = omissions))
             }
         }
         connectionJob = newScope.launch {
@@ -99,10 +111,18 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     fun stop() {
         connectionJob?.cancel()
         connectionJob = null
+        wakeOnLanCorrelation = null
+        wakeOnLanTimeoutJob?.cancel()
+        wakeOnLanTimeoutJob = null
         disconnectClient()
         scope?.cancel()
         scope = null
-        update { it.copy(broker = BrokerEstado.DESCONECTADO) }
+        update {
+            it.copy(
+                broker = BrokerEstado.DESCONECTADO,
+                wakeOnLan = WakeOnLanState(),
+            )
+        }
     }
 
     fun requestEmailEvents() {
@@ -147,8 +167,118 @@ class MqttSession(context: Context) : MqttCallbackExtended {
             pendingRequests[correlation] = CompletableDeferred()
             try {
                 publish("${MqttConfig.RPC_REQ_ROOT}/send_email_test", request.toString())
-                withTimeoutOrNull(RPC_TIMEOUT_MS) { pendingRequests[correlation]?.await() }
+                val result = withTimeoutOrNull(RPC_TIMEOUT_MS) { pendingRequests[correlation]?.await() }
                     ?: throw IllegalStateException("Tiempo agotado al solicitar prueba de correo")
+                check(result.optBoolean("ok", false)) {
+                    result.optString("error").ifBlank { "La prueba de correo fue rechazada" }
+                }
+                delay(3_000L)
+                requestEmailEvents()
+                delay(12_000L)
+                requestEmailEvents()
+            } catch (error: Exception) {
+                update { it.copy(error = error.message ?: "No se pudo solicitar la prueba de correo") }
+            } finally {
+                pendingRequests.remove(correlation)
+            }
+        }
+    }
+
+    fun requestWakeOnLan() {
+        val currentStatus = stateStore.value.wakeOnLan.status
+        if (currentStatus == WakeOnLanStatus.REQUESTING || currentStatus == WakeOnLanStatus.PACKET_SENT) return
+        val runningScope = scope
+        val mqttClient = client
+        if (runningScope == null || mqttClient?.isConnected != true) {
+            update {
+                it.copy(
+                    wakeOnLan = WakeOnLanState(
+                        WakeOnLanStatus.ERROR,
+                        appContext.getString(servicoop.comunic.panelito.R.string.wol_error_broker),
+                    ),
+                )
+            }
+            return
+        }
+
+        val correlation = UUID.randomUUID().toString()
+        wakeOnLanCorrelation = correlation
+        wakeOnLanTimeoutJob?.cancel()
+        update { it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.REQUESTING)) }
+        wakeOnLanTimeoutJob = runningScope.launch {
+            try {
+                val request = JSONObject()
+                    .put("reply_to", MqttConfig.rpcResponseTopic(clientId, correlation))
+                    .put("corr", correlation)
+                    .put("params", JSONObject().put("contract_version", 1))
+                publish(MqttConfig.WOL_REQUEST_TOPIC, request.toString())
+                delay(WOL_RESPONSE_TIMEOUT_MS)
+                if (wakeOnLanCorrelation == correlation) {
+                    finishWakeOnLan(
+                        WakeOnLanStatus.ERROR,
+                        appContext.getString(servicoop.comunic.panelito.R.string.wol_error_timeout),
+                    )
+                }
+            } catch (error: Exception) {
+                if (wakeOnLanCorrelation == correlation) {
+                    finishWakeOnLan(
+                        WakeOnLanStatus.ERROR,
+                        error.message ?: appContext.getString(servicoop.comunic.panelito.R.string.wol_error_request),
+                    )
+                }
+            }
+        }
+    }
+
+    fun omitMobileUpdate() {
+        val release = stateStore.value.mobileRelease
+        if (!release.updateRequired || release.updateMandatory) return
+        val next = (release.omissionsUsed + 1).coerceAtMost(release.maxOmissions)
+        update {
+            it.copy(
+                mobileRelease = release.copy(
+                    omissionsUsed = next,
+                    updateMandatory = next >= release.maxOmissions,
+                ),
+            )
+        }
+        storageScope.launch { settings.saveMobileUpdateOmissions(next) }
+    }
+
+    fun requestMobileRelease() {
+        val runningScope = scope ?: return
+        runningScope.launch {
+            val mqttClient = client ?: return@launch
+            if (!mqttClient.isConnected) return@launch
+            val correlation = UUID.randomUUID().toString()
+            val replyTopic = MqttConfig.rpcResponseTopic(clientId, correlation)
+            val response = CompletableDeferred<JSONObject>()
+            pendingRequests[correlation] = response
+            update { it.copy(mobileRelease = it.mobileRelease.copy(checking = true, error = null)) }
+            try {
+                val request = JSONObject()
+                    .put("reply_to", replyTopic)
+                    .put("corr", correlation)
+                    .put(
+                        "params",
+                        JSONObject()
+                            .put("contract_version", 1)
+                            .put("app", "panelito")
+                            .put("platform", "android")
+                            .put("current_version", BuildConfig.VERSION_NAME)
+                            .put("current_version_code", BuildConfig.VERSION_CODE),
+                    )
+                publish("${MqttConfig.RPC_REQ_ROOT}/get_mobile_release", request.toString())
+                val result = withTimeoutOrNull(RPC_TIMEOUT_MS) { response.await() }
+                    ?: error("Tiempo agotado al consultar la actualizacion")
+                check(result.optBoolean("ok", false)) {
+                    result.optString("error").ifBlank { "No se pudo consultar la actualizacion" }
+                }
+                applyMobileRelease(result.getJSONObject("data"))
+            } catch (error: Exception) {
+                update {
+                    it.copy(mobileRelease = it.mobileRelease.copy(checking = false, error = error.message))
+                }
             } finally {
                 pendingRequests.remove(correlation)
             }
@@ -179,9 +309,16 @@ class MqttSession(context: Context) : MqttCallbackExtended {
             update { it.copy(error = error.message ?: "No se pudieron suscribir los topicos") }
         }
         requestEmailEvents()
+        requestMobileRelease()
     }
 
     override fun connectionLost(cause: Throwable?) {
+        if (wakeOnLanCorrelation != null) {
+            finishWakeOnLan(
+                WakeOnLanStatus.ERROR,
+                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_broker),
+            )
+        }
         update {
             it.copy(
                 broker = BrokerEstado.REINTENTANDO,
@@ -268,8 +405,11 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     }
 
     private fun parseGrade(payload: String) {
-        val percentage = JSONObject(payload).optDouble("porcentaje", Double.NaN)
-        if (!percentage.isNaN()) update { it.copy(gradoPct = percentage) }
+        val source = JSONObject(payload)
+        val percentage = source.getDouble("porcentaje")
+        val unavailable = source.getInt("no_disponibles")
+        require(percentage in 0.0..100.0 && unavailable >= 0) { "Resumen GRD invalido" }
+        update { it.copy(gradoPct = percentage, grdUnavailableCount = unavailable) }
     }
 
     private fun parseModem(payload: String): ModemEstado {
@@ -280,13 +420,18 @@ class MqttSession(context: Context) : MqttCallbackExtended {
 
     private fun parseGe(topic: String, payload: String) {
         val source = JSONObject(payload)
+        val building = if (topic == MqttConfig.TOPIC_GE_FONTANA) GE_EDIF_FONTANA else GE_EDIF_ESTIVARIZ
+        val sourceStatus = source.optString("source_status", "available")
+        if (sourceStatus != "available") {
+            update { it.copy(geStates = it.geStates + (building to GeEstado.DESCONOCIDO)) }
+            return
+        }
         val line = source.getJSONObject("interruptor_linea")
         val bit = line.getInt("bit")
         val expected = if (bit == 1) "cerrado" else "abierto"
         val state = line.getString("estado")
         require(bit == 0 || bit == 1) { "interruptor_linea.bit fuera de rango" }
         require(state.equals(expected, true)) { "interruptor_linea.estado no coincide con bit" }
-        val building = if (topic == MqttConfig.TOPIC_GE_FONTANA) GE_EDIF_FONTANA else GE_EDIF_ESTIVARIZ
         update { it.copy(geStates = it.geStates + (building to GeEstado.fromLineState(state, bit))) }
     }
 
@@ -300,7 +445,78 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     private fun handleRpcResponse(payload: String) {
         val source = JSONObject(payload)
         val correlation = source.optString("corr")
+        if (
+            source.optString("action") == "wake_host" &&
+            correlation.isNotBlank() &&
+            correlation == wakeOnLanCorrelation
+        ) {
+            handleWakeOnLanResponse(source)
+            return
+        }
         pendingRequests[correlation]?.complete(source)
+    }
+
+    private fun handleWakeOnLanResponse(source: JSONObject) {
+        if (!source.optBoolean("ok", false)) {
+            finishWakeOnLan(
+                WakeOnLanStatus.ERROR,
+                source.optString("error").ifBlank {
+                    appContext.getString(servicoop.comunic.panelito.R.string.wol_error_request)
+                },
+            )
+            return
+        }
+        val data = source.optJSONObject("data") ?: return
+        if (data.optInt("contract_version") != 1) return
+        when (data.optString("status")) {
+            "packet_sent" -> update {
+                it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.PACKET_SENT))
+            }
+            "ssh_open" -> finishWakeOnLan(WakeOnLanStatus.SSH_OPEN, null)
+        }
+    }
+
+    private fun finishWakeOnLan(status: WakeOnLanStatus, detail: String?) {
+        wakeOnLanCorrelation = null
+        wakeOnLanTimeoutJob?.cancel()
+        wakeOnLanTimeoutJob = null
+        update { it.copy(wakeOnLan = WakeOnLanState(status, detail)) }
+    }
+
+    private fun applyMobileRelease(source: JSONObject) {
+        require(source.getInt("contract_version") == 1) { "Contrato de actualizacion invalido" }
+        require(source.getString("app") == "panelito") { "La actualizacion corresponde a otra aplicacion" }
+        require(source.getString("platform") == "android") { "Plataforma de actualizacion invalida" }
+        require(source.getString("hash_algorithm") == "sha256") { "Algoritmo de integridad invalido" }
+        val versionName = source.getString("latest_version").also { require(it.isNotBlank()) }
+        val versionCode = source.getLong("artifact_version_code").also { require(it > 0L) }
+        val sizeBytes = source.getLong("artifact_size_bytes").also { require(it > 0L) }
+        val hash = source.getString("artifact_hash").lowercase()
+            .also { require(it.matches(Regex("^[a-f0-9]{64}$"))) }
+        val apkUrl = source.getString("apk_url").also { require(it.isNotBlank()) }
+        val maxOmissions = source.getInt("max_omissions").also { require(it >= 0) }
+        val updateRequired = source.getBoolean("update_required")
+        require(updateRequired == (versionCode > BuildConfig.VERSION_CODE.toLong())) {
+            "Decision de actualizacion inconsistente"
+        }
+        val omissions = stateStore.value.mobileRelease.omissionsUsed.coerceAtMost(maxOmissions)
+        if (!updateRequired) storageScope.launch { settings.saveMobileUpdateOmissions(0) }
+        update {
+            it.copy(
+                mobileRelease = MobileReleaseState(
+                    checking = false,
+                    updateRequired = updateRequired,
+                    updateMandatory = updateRequired && omissions >= maxOmissions,
+                    versionName = versionName,
+                    versionCode = versionCode,
+                    apkUrl = apkUrl,
+                    sha256 = hash,
+                    sizeBytes = sizeBytes,
+                    maxOmissions = maxOmissions,
+                    omissionsUsed = if (updateRequired) omissions else 0,
+                ),
+            )
+        }
     }
 
     private fun parseEmailEvents(items: JSONArray): List<EmailEvent> = buildList {
@@ -310,9 +526,12 @@ class MqttSession(context: Context) : MqttCallbackExtended {
             if (timestamp.isBlank()) continue
             add(
                 EmailEvent(
+                    id = item.optString("id"),
                     type = item.optString("type", "email"),
                     subject = item.optString("subject"),
-                    ok = item.optBoolean("ok", false),
+                    status = item.optString("status").ifBlank {
+                        if (item.optBoolean("ok", false)) "sent" else "failed"
+                    },
                     timestamp = timestamp,
                     detail = item.optString("detail"),
                 ),
@@ -323,7 +542,7 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     private fun mergeEmailEvents(incoming: List<EmailEvent>) {
         if (incoming.isEmpty()) return
         val merged = (incoming + stateStore.value.emailEvents)
-            .distinctBy { "${it.timestamp}|${it.subject}|${it.ok}|${it.detail}" }
+            .distinctBy { it.id.ifBlank { "${it.timestamp}|${it.subject}|${it.status}|${it.detail}" } }
             .sortedByDescending { it.timestamp }
             .take(MAX_EMAIL_EVENTS)
         update { it.copy(emailEvents = merged) }
@@ -339,5 +558,6 @@ class MqttSession(context: Context) : MqttCallbackExtended {
         const val GE_EDIF_FONTANA = "edif-fontana"
         private const val MAX_EMAIL_EVENTS = 50
         private const val RPC_TIMEOUT_MS = 10_000L
+        private const val WOL_RESPONSE_TIMEOUT_MS = 190_000L
     }
 }

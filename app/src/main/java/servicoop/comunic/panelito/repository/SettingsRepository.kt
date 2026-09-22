@@ -11,4 +11,8 @@ interface SettingsRepository {
     fun getEmailEvents(): Flow<List<EmailEvent>>
 
     suspend fun saveEmailEvents(events: List<EmailEvent>)
+
+    fun getMobileUpdateOmissions(): Flow<Int>
+
+    suspend fun saveMobileUpdateOmissions(value: Int)
 }

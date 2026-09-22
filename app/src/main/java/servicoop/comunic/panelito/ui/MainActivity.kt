@@ -3,6 +3,8 @@
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +15,7 @@ import kotlinx.coroutines.launch
 import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.core.model.BrokerEstado
+import servicoop.comunic.panelito.core.model.MobileReleaseState
 import servicoop.comunic.panelito.fragment.CharitoFragment
 import servicoop.comunic.panelito.fragment.CheatSheetFragment
 import servicoop.comunic.panelito.fragment.DashboardFragment
@@ -20,12 +23,15 @@ import servicoop.comunic.panelito.fragment.EmailEventsFragment
 import servicoop.comunic.panelito.fragment.ProxmoxFragment
 import servicoop.comunic.panelito.fragment.TelefonosFragment
 import servicoop.comunic.panelito.services.mqtt.MqttSession
+import servicoop.comunic.panelito.update.MobileUpdateRequest
+import servicoop.comunic.panelito.update.installMobileUpdate
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var viewPager: ViewPager2
     private lateinit var indicatorBroker: View
     private lateinit var txtBroker: TextView
+    private var displayedReleaseCode: Long? = null
     private val mqttSession: MqttSession
         get() = (application as PanelitoApplication).mqttSession
 
@@ -40,7 +46,10 @@ class MainActivity : AppCompatActivity() {
         viewPager.adapter = MainPagerAdapter(this)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                mqttSession.state.collect { state -> updateBrokerUi(state.broker) }
+                mqttSession.state.collect { state ->
+                    updateBrokerUi(state.broker)
+                    showMobileRelease(state.mobileRelease)
+                }
             }
         }
     }
@@ -65,6 +74,40 @@ class MainActivity : AppCompatActivity() {
         indicatorBroker.setBackgroundResource(indicator)
     }
 
+    private fun showMobileRelease(release: MobileReleaseState) {
+        val versionCode = release.versionCode ?: return
+        if (!release.updateRequired || release.checking || displayedReleaseCode == versionCode) return
+        val apkUrl = release.apkUrl ?: return
+        val sha256 = release.sha256 ?: return
+        val sizeBytes = release.sizeBytes ?: return
+        displayedReleaseCode = versionCode
+        val builder = AlertDialog.Builder(this)
+            .setTitle(R.string.mobile_update_title)
+            .setMessage(getString(R.string.mobile_update_message, release.versionName.orEmpty()))
+            .setCancelable(!release.updateMandatory)
+            .setPositiveButton(R.string.mobile_update_install) { _, _ ->
+                lifecycleScope.launch {
+                    runCatching {
+                        installMobileUpdate(
+                            applicationContext,
+                            MobileUpdateRequest(apkUrl, sha256, sizeBytes, versionCode),
+                        )
+                    }.onFailure {
+                        displayedReleaseCode = null
+                        Toast.makeText(
+                            this@MainActivity,
+                            getString(R.string.mobile_update_failed),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
+        if (!release.updateMandatory) {
+            builder.setNegativeButton(R.string.mobile_update_later) { _, _ -> mqttSession.omitMobileUpdate() }
+        }
+        builder.show()
+    }
+
     private class MainPagerAdapter(activity: AppCompatActivity) : FragmentStateAdapter(activity) {
         override fun getItemCount(): Int = 6
 
@@ -78,5 +121,3 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
-
-

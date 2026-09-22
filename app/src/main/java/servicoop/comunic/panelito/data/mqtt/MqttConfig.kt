@@ -43,6 +43,7 @@ object MqttConfig {
 
     const val RPC_REQ_ROOT = "$BASE/rpc/request"
     const val RPC_RES_ROOT = "$BASE/rpc/response"
+    const val WOL_REQUEST_TOPIC = "$BASE/wol/request"
 
     fun rpcResponseSubscription(clientId: String): String = "$RPC_RES_ROOT/$clientId/+"
 
@@ -51,7 +52,6 @@ object MqttConfig {
     // QoS recomendado
     const val QOS_SUBS = 1
 }
-
 
 
 

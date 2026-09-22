@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.launch
 import servicoop.comunic.panelito.R
 import servicoop.comunic.panelito.PanelitoApplication
 import servicoop.comunic.panelito.core.model.BrokerEstado
@@ -73,7 +74,7 @@ class DashboardFragment : Fragment() {
         when (brokerEstado) {
             BrokerEstado.CONECTADO -> {
                 actualizarModemEstado(state.modem)
-                state.gradoPct?.let { actualizarGrado(it) }
+                state.gradoPct?.let { actualizarGrado(it, state.grdUnavailableCount) }
                 state.grdsJson?.let { actualizarGrds(it) }
             }
             BrokerEstado.DESCONECTADO -> {
@@ -106,12 +107,17 @@ class DashboardFragment : Fragment() {
         indicatorModem.setBackgroundResource(R.drawable.led_naranja)
     }
 
-    private fun actualizarGrado(porcentaje: Double) {
+    private fun actualizarGrado(porcentaje: Double, noDisponibles: Int) {
         val pct = porcentaje.coerceIn(0.0, 100.0)
         progressGrado.progress = pct.toInt()
-        txtGradoPct.text = getString(R.string.percent_format, pct)
+        txtGradoPct.text = if (noDisponibles > 0) {
+            getString(R.string.percent_with_unavailable_format, pct, noDisponibles)
+        } else {
+            getString(R.string.percent_format, pct)
+        }
 
         val led = when {
+            noDisponibles > 0 -> R.drawable.led_naranja
             pct < Thresholds.ROJO -> R.drawable.led_rojo
             pct < Thresholds.AMARILLO -> R.drawable.led_naranja
             else -> R.drawable.led_verde
