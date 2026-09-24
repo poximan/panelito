@@ -396,7 +396,8 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     }
 
     private fun publish(topic: String, payload: String) {
-        val mqttClient = client ?: return
+        val mqttClient = client ?: throw IllegalStateException("MQTT no esta inicializado")
+        check(mqttClient.isConnected) { "MQTT no esta conectado" }
         val message = MqttMessage(payload.toByteArray(Charsets.UTF_8)).apply {
             qos = MqttConfig.QOS_SUBS
             isRetained = false
@@ -466,13 +467,36 @@ class MqttSession(context: Context) : MqttCallbackExtended {
             )
             return
         }
-        val data = source.optJSONObject("data") ?: return
-        if (data.optInt("contract_version") != 1) return
+        val data = source.optJSONObject("data")
+        if (data == null) {
+            finishWakeOnLan(
+                WakeOnLanStatus.ERROR,
+                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_contract),
+            )
+            return
+        }
+        if (
+            data.optInt("contract_version") != 1 ||
+            data.optString("request_id") != wakeOnLanCorrelation
+        ) {
+            finishWakeOnLan(
+                WakeOnLanStatus.ERROR,
+                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_contract),
+            )
+            return
+        }
         when (data.optString("status")) {
+            "accepted" -> update {
+                it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.REQUESTING))
+            }
             "packet_sent" -> update {
                 it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.PACKET_SENT))
             }
             "ssh_open" -> finishWakeOnLan(WakeOnLanStatus.SSH_OPEN, null)
+            else -> finishWakeOnLan(
+                WakeOnLanStatus.ERROR,
+                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_contract),
+            )
         }
     }
 

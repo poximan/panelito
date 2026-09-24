@@ -113,7 +113,7 @@
     <string name="wol_title">Encendido remoto</string>
     <string name="wol_button">wololo</string>
     <string name="wol_button_description">Encender equipo remoto mediante Wake-on-LAN</string>
-    <string name="wol_status_idle">Listo para enviar el paquete mágico a 10.10.4.125.</string>
+    <string name="wol_status_idle">Listo para enviar el paquete mágico al equipo configurado.</string>
     <string name="wol_status_requesting">Enviando la orden a Lechu...</string>
     <string name="wol_status_packet_sent">Paquete mágico emitido; esperando que abra SSH.</string>
     <string name="wol_status_ssh_open">Equipo disponible por SSH.</string>
@@ -121,6 +121,7 @@
     <string name="wol_error_broker">MQTT no está conectado.</string>
     <string name="wol_error_timeout">Lechu no confirmó el estado del equipo dentro del plazo.</string>
     <string name="wol_error_request">No se pudo solicitar el encendido remoto.</string>
+    <string name="wol_error_contract">Lechu respondió con un estado de encendido inválido.</string>
 
     <string name="email_test_button">Probar email</string>
     <string name="email_test_disabled">Broker desconectado</string>
