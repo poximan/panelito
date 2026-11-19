@@ -1,13 +1,7 @@
 package servicoop.comunic.panelito.data.mqtt
 
-import servicoop.comunic.panelito.BuildConfig
 
 object MqttConfig {
-    // Conexion
-    val brokerUrl: String = BuildConfig.PANELITO_MQTT_BROKER_URL
-    val username: String = BuildConfig.PANELITO_MQTT_USERNAME
-    val password: String = BuildConfig.PANELITO_MQTT_PASSWORD
-
     // Ajustes energeticos
     // Mantener 300s suele balancear NAT timeouts vs. pings (tuneable segun carrier).
     const val KEEP_ALIVE_SECONDS = 300
@@ -43,7 +37,6 @@ object MqttConfig {
 
     const val RPC_REQ_ROOT = "$BASE/rpc/request"
     const val RPC_RES_ROOT = "$BASE/rpc/response"
-    const val WOL_REQUEST_TOPIC = "$BASE/wol/request"
 
     fun rpcResponseSubscription(clientId: String): String = "$RPC_RES_ROOT/$clientId/+"
 

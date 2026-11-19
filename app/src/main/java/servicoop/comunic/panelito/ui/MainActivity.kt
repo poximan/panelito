@@ -1,5 +1,9 @@
-﻿package servicoop.comunic.panelito.ui
+package servicoop.comunic.panelito.ui
 
+import android.content.Intent
+import androidx.activity.result.contract.ActivityResultContracts
+import servicoop.android.credentials.BrokerCredentialsActivity
+import servicoop.android.credentials.BrokerCredentialsStore
 import android.os.Bundle
 import android.view.View
 import android.widget.TextView
@@ -28,6 +32,10 @@ import servicoop.comunic.panelito.update.installMobileUpdate
 
 class MainActivity : AppCompatActivity() {
 
+    private val credentialLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) mqttSession.start()
+        else if (runCatching { BrokerCredentialsStore(this).load() }.getOrNull() == null) finish()
+    }
     private lateinit var viewPager: ViewPager2
     private lateinit var indicatorBroker: View
     private lateinit var txtBroker: TextView
@@ -43,6 +51,9 @@ class MainActivity : AppCompatActivity() {
         txtBroker = findViewById(R.id.txt_broker)
         viewPager = findViewById(R.id.view_pager)
 
+        findViewById<View>(R.id.configure_broker).setOnClickListener {
+            credentialLauncher.launch(Intent(this, BrokerCredentialsActivity::class.java))
+        }
         viewPager.adapter = MainPagerAdapter(this)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -56,7 +67,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        mqttSession.start()
+        if (runCatching { BrokerCredentialsStore(this).load() }.getOrNull() != null) {
+            mqttSession.start()
+        } else {
+            credentialLauncher.launch(Intent(this, BrokerCredentialsActivity::class.java))
+        }
     }
 
     override fun onStop() {

@@ -5,7 +5,6 @@ import servicoop.comunic.panelito.core.model.EmailEvent
 import servicoop.comunic.panelito.core.model.GeEstado
 import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.core.model.MobileReleaseState
-import servicoop.comunic.panelito.core.model.WakeOnLanState
 
 data class MqttState(
     val broker: BrokerEstado = BrokerEstado.DESCONECTADO,
@@ -22,5 +21,4 @@ data class MqttState(
     val lechuStatusTimestamp: String? = null,
     val error: String? = null,
     val mobileRelease: MobileReleaseState = MobileReleaseState(),
-    val wakeOnLan: WakeOnLanState = WakeOnLanState(),
 )

@@ -11,7 +11,7 @@ No es fuente de verdad de ningun dominio operativo. Puede conservar datos locale
 ## Integracion MQTT
 
 La app se conecta al broker configurado y consume los contratos versionados de `lechuza-server`.
-El broker y las credenciales se inyectan desde `local.properties` (ver `local.properties.example`); no se guardan en recursos ni en git.
+El acceso se aprovisiona en cada dispositivo y se guarda cifrado; no se incorpora a la compilación ni a Git.
 
 Topicos consumidos principales:
 
@@ -61,3 +61,11 @@ Acciones RPC vigentes:
 ## Configuracion y secretos
 
 La configuracion operativa debe mantenerse fuera de git cuando contenga credenciales, hosts reales o endpoints sensibles. Los valores versionados deben ser plantillas o ejemplos sin secreto real.
+
+## Aprovisionamiento MQTT
+
+La app solicita el acceso MQTT al primer ingreso. Se puede modificar con el icono
+de configuración junto al estado del broker. Se utiliza el módulo compartido
+`../../../platform/android-credentials`; el APK no contiene credenciales.
+Ver su README para almacenamiento, TLS y provisión por dispositivo.
+`local.properties` contiene únicamente la ruta local del SDK.

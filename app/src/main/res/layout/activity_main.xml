@@ -31,6 +31,12 @@
             android:layout_marginStart="12dp"
             android:text="@string/broker_status_placeholder"
             android:textSize="16sp" />
+        <ImageButton
+            android:id="@+id/configure_broker"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/broker_credentials_configure"
+            android:src="@android:drawable/ic_menu_preferences" />
     </LinearLayout>
 
     <androidx.viewpager2.widget.ViewPager2

@@ -1,5 +1,6 @@
 package servicoop.comunic.panelito.services.mqtt
 
+import servicoop.android.credentials.BrokerCredentialsStore
 import android.content.Context
 import android.provider.Settings
 import kotlinx.coroutines.CompletableDeferred
@@ -31,8 +32,6 @@ import servicoop.comunic.panelito.core.model.EmailEvent
 import servicoop.comunic.panelito.core.model.GeEstado
 import servicoop.comunic.panelito.core.model.ModemEstado
 import servicoop.comunic.panelito.core.model.MobileReleaseState
-import servicoop.comunic.panelito.core.model.WakeOnLanState
-import servicoop.comunic.panelito.core.model.WakeOnLanStatus
 import servicoop.comunic.panelito.data.datastore.SettingsDataStore
 import servicoop.comunic.panelito.data.mqtt.MqttConfig
 import java.util.UUID
@@ -57,8 +56,6 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     private var connectionJob: Job? = null
     private var client: MqttClient? = null
     private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JSONObject>>()
-    private var wakeOnLanCorrelation: String? = null
-    private var wakeOnLanTimeoutJob: Job? = null
     private val clientId: String by lazy {
         val androidId = Settings.Secure.getString(
             appContext.contentResolver,
@@ -111,16 +108,12 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     fun stop() {
         connectionJob?.cancel()
         connectionJob = null
-        wakeOnLanCorrelation = null
-        wakeOnLanTimeoutJob?.cancel()
-        wakeOnLanTimeoutJob = null
         disconnectClient()
         scope?.cancel()
         scope = null
         update {
             it.copy(
                 broker = BrokerEstado.DESCONECTADO,
-                wakeOnLan = WakeOnLanState(),
             )
         }
     }
@@ -180,52 +173,6 @@ class MqttSession(context: Context) : MqttCallbackExtended {
                 update { it.copy(error = error.message ?: "No se pudo solicitar la prueba de correo") }
             } finally {
                 pendingRequests.remove(correlation)
-            }
-        }
-    }
-
-    fun requestWakeOnLan() {
-        val currentStatus = stateStore.value.wakeOnLan.status
-        if (currentStatus == WakeOnLanStatus.REQUESTING || currentStatus == WakeOnLanStatus.PACKET_SENT) return
-        val runningScope = scope
-        val mqttClient = client
-        if (runningScope == null || mqttClient?.isConnected != true) {
-            update {
-                it.copy(
-                    wakeOnLan = WakeOnLanState(
-                        WakeOnLanStatus.ERROR,
-                        appContext.getString(servicoop.comunic.panelito.R.string.wol_error_broker),
-                    ),
-                )
-            }
-            return
-        }
-
-        val correlation = UUID.randomUUID().toString()
-        wakeOnLanCorrelation = correlation
-        wakeOnLanTimeoutJob?.cancel()
-        update { it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.REQUESTING)) }
-        wakeOnLanTimeoutJob = runningScope.launch {
-            try {
-                val request = JSONObject()
-                    .put("reply_to", MqttConfig.rpcResponseTopic(clientId, correlation))
-                    .put("corr", correlation)
-                    .put("params", JSONObject().put("contract_version", 1))
-                publish(MqttConfig.WOL_REQUEST_TOPIC, request.toString())
-                delay(WOL_RESPONSE_TIMEOUT_MS)
-                if (wakeOnLanCorrelation == correlation) {
-                    finishWakeOnLan(
-                        WakeOnLanStatus.ERROR,
-                        appContext.getString(servicoop.comunic.panelito.R.string.wol_error_timeout),
-                    )
-                }
-            } catch (error: Exception) {
-                if (wakeOnLanCorrelation == correlation) {
-                    finishWakeOnLan(
-                        WakeOnLanStatus.ERROR,
-                        error.message ?: appContext.getString(servicoop.comunic.panelito.R.string.wol_error_request),
-                    )
-                }
             }
         }
     }
@@ -313,12 +260,6 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     }
 
     override fun connectionLost(cause: Throwable?) {
-        if (wakeOnLanCorrelation != null) {
-            finishWakeOnLan(
-                WakeOnLanStatus.ERROR,
-                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_broker),
-            )
-        }
         update {
             it.copy(
                 broker = BrokerEstado.REINTENTANDO,
@@ -361,8 +302,9 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     override fun deliveryComplete(token: IMqttDeliveryToken?) = Unit
 
     private fun connectOnce() {
+        val credentials = BrokerCredentialsStore(appContext).require()
         val mqttClient = MqttClient(
-            MqttConfig.brokerUrl,
+            credentials.brokerUri,
             clientId,
             MemoryPersistence(),
         )
@@ -370,8 +312,8 @@ class MqttSession(context: Context) : MqttCallbackExtended {
         val options = MqttConnectOptions().apply {
             isCleanSession = true
             isAutomaticReconnect = false
-            userName = MqttConfig.username
-            password = MqttConfig.password.toCharArray()
+            userName = credentials.username
+            password = credentials.password.toCharArray()
             connectionTimeout = 10
             keepAliveInterval = MqttConfig.KEEP_ALIVE_SECONDS
             maxInflight = 4
@@ -446,65 +388,7 @@ class MqttSession(context: Context) : MqttCallbackExtended {
     private fun handleRpcResponse(payload: String) {
         val source = JSONObject(payload)
         val correlation = source.optString("corr")
-        if (
-            source.optString("action") == "wake_host" &&
-            correlation.isNotBlank() &&
-            correlation == wakeOnLanCorrelation
-        ) {
-            handleWakeOnLanResponse(source)
-            return
-        }
         pendingRequests[correlation]?.complete(source)
-    }
-
-    private fun handleWakeOnLanResponse(source: JSONObject) {
-        if (!source.optBoolean("ok", false)) {
-            finishWakeOnLan(
-                WakeOnLanStatus.ERROR,
-                source.optString("error").ifBlank {
-                    appContext.getString(servicoop.comunic.panelito.R.string.wol_error_request)
-                },
-            )
-            return
-        }
-        val data = source.optJSONObject("data")
-        if (data == null) {
-            finishWakeOnLan(
-                WakeOnLanStatus.ERROR,
-                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_contract),
-            )
-            return
-        }
-        if (
-            data.optInt("contract_version") != 1 ||
-            data.optString("request_id") != wakeOnLanCorrelation
-        ) {
-            finishWakeOnLan(
-                WakeOnLanStatus.ERROR,
-                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_contract),
-            )
-            return
-        }
-        when (data.optString("status")) {
-            "accepted" -> update {
-                it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.REQUESTING))
-            }
-            "packet_sent" -> update {
-                it.copy(wakeOnLan = WakeOnLanState(WakeOnLanStatus.PACKET_SENT))
-            }
-            "ssh_open" -> finishWakeOnLan(WakeOnLanStatus.SSH_OPEN, null)
-            else -> finishWakeOnLan(
-                WakeOnLanStatus.ERROR,
-                appContext.getString(servicoop.comunic.panelito.R.string.wol_error_contract),
-            )
-        }
-    }
-
-    private fun finishWakeOnLan(status: WakeOnLanStatus, detail: String?) {
-        wakeOnLanCorrelation = null
-        wakeOnLanTimeoutJob?.cancel()
-        wakeOnLanTimeoutJob = null
-        update { it.copy(wakeOnLan = WakeOnLanState(status, detail)) }
     }
 
     private fun applyMobileRelease(source: JSONObject) {
@@ -582,6 +466,5 @@ class MqttSession(context: Context) : MqttCallbackExtended {
         const val GE_EDIF_FONTANA = "edif-fontana"
         private const val MAX_EMAIL_EVENTS = 50
         private const val RPC_TIMEOUT_MS = 10_000L
-        private const val WOL_RESPONSE_TIMEOUT_MS = 190_000L
     }
 }

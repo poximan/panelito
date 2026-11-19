@@ -15,3 +15,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "panelito"
 include(":app")
+
+include(":android-credentials")
+project(":android-credentials").projectDir = file("../../../platform/android-credentials")
